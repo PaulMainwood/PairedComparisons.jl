@@ -2,9 +2,10 @@ module PairedComparisons
 
 using DataFrames
 
-include("elo.jl")
 include("helper.jl")
+include("elo.jl")
+include("glicko.jl")
 
-export Elo, fit!, one_ahead!, predict
+export Elo, Glicko, fit!, one_ahead!, predict
 
 end # module

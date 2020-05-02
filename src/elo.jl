@@ -62,7 +62,6 @@ function one_ahead!(m::Elo, games::DataFrame; prediction_function = predict)
     for day_games in groupby(games, 5)
         day_games = DataFrame(day_games)
         p = prediction_function.(Ref(m), day_games[:, 1], day_games[:, 2])
-        #day_games[!, :Predict] = p
         predictions = vcat(predictions, p)
         fit!(m, day_games)
     end
