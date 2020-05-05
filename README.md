@@ -21,7 +21,7 @@ All the algorithms take games in DataFrames format. They expect four or five col
 * P2Won = Number of games/points won by P2 on that day/match
 * Day = Integer giving a time period in which the match-ups took place (e.g., the number of day or week).
 
-The titles of the columns do not matter, just the order given above.
+The names given to these columns do not matter, but the package expects them in the order above.
 
 If you omit the "Day" column, there is a special "fast" version of the elo algorithm that treats each line as a separate time period and rates in the order given in the dataframe. The other algorithms need a time period and will error out if it is missed out.
 
