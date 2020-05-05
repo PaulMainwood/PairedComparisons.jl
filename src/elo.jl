@@ -5,6 +5,12 @@ struct Elo
     default_rating::Real
 end
 
+function Elo(;kfac = 85.0, ratings = Dict{Int64, Float64}(), default_rating = 1500.0)
+    #Set up a new Elo struct, either using key words or defaults if not provided
+    return Elo(kfac, ratings, default_rating)
+end
+
+
 function fit!(m::Elo, games::DataFrame; verbose = false)
     #= Wrapper function to choose the right approach to fit a dataframe of games =#
     if size(games, 2) == 4
@@ -54,8 +60,8 @@ function period_fit!(m::Elo, original_games::DataFrame)
 end
 
 
-#Predicts with one-ahead for each day
 function one_ahead!(m::Elo, games::DataFrame; prediction_function = predict)
+    #Predicts with one-ahead for each day
     sort!(games, 5)
     predictions = Float64[]
     #Split into days which are then predicted ahead of time
@@ -68,19 +74,18 @@ function one_ahead!(m::Elo, games::DataFrame; prediction_function = predict)
     return predictions
 end
 
-#Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
 function predict(m::Elo, i::Integer, j::Integer)
-
+    #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
     return 1.0 / (1.0 + 10.0 ^ ((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating)) / 400.0))
 end
 
-#Returns the predicted result for any two players in the existing Elo rating dictionary, for multiple matches
 function predict(m::Elo, i::Integer, j::Integer, P1_games, P2_games)
+    #Returns the predicted result for any two players in the existing Elo rating dictionary, for multiple matches
     return (P1_games + P2_games) / (1.0 + 10.0 ^ ((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating)) / 400.0))
 end
 
-#Update function allowing for period in which there may be duplicate games
 function update!(m::Elo, games)
+    #Update function allowing for period in which there may be duplicate games
     for row in eachrow(games)
         if ismissing(row.P1_wins)
             return nothing

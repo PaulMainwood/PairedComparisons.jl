@@ -4,6 +4,11 @@ struct Glicko
     ratings::Dict
 end
 
+function Glicko(;c = 85.0, default_rating = (1500.0, 350.0), ratings = Dict{Int64, Tuple}())
+    #Set up a new Elo struct, either using key words or defaults if not provided
+    return Glicko(c, default_rating, ratings)
+end
+
 #Fit the Glicko rating to some new data
 function fit!(glicko::Glicko, original_games::DataFrame)
 
@@ -60,7 +65,6 @@ function update_player_rating(player::Int64, opponents, player_wins, opponent_wi
 
     return r_updated, RD_updated
 end
-
 
 #Predicts with one-ahead for each day
 function one_ahead!(m::Glicko, games::DataFrame; prediction_function = predict)

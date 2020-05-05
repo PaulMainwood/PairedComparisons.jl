@@ -3,8 +3,8 @@
 
 function dupe_for_rating(games)
     #Takes dataframe of games and predictions, reverses the players, result and prediction and appends them to end
-    original = rename(games, [:P1, :P2, :P1_wins, :P2_wins, :Day], makeunique=true)
-    dupe_backwards = rename(games, [:P2, :P1, :P2_wins, :P1_wins, :Day], makeunique=true)
+    original = rename(games, [:P1, :P2, :P1_wins, :P2_wins, :Day], makeunique = true)
+    dupe_backwards = rename(games, [:P2, :P1, :P2_wins, :P1_wins, :Day], makeunique = true)
     return sort!(vcat(original, dupe_backwards), :Day)
 end
 
