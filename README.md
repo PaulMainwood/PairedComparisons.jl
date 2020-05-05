@@ -5,7 +5,7 @@ A Julia package implementing methods of rating entities based on win-loss compar
 - Elo (Arpad Elo's system: https://en.wikipedia.org/wiki/Elo_rating_system)
 - Glicko (Mark Glickman's system: http://www.glicko.net/research/glicko.pdf)
 - Bradley-Terry (Zermelo's system, badly named: https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model)
-- Whole History Rating (Remi Coulom's time-drifting version of Bradley-Terry, as outlined https://www.remi-coulom.fr/WHR/WHR.pdf)
+- Whole History Rating (Remi Coulom's time-drifting version of Bradley-Terry, https://www.remi-coulom.fr/WHR/WHR.pdf)
 
 The package allows each algorithm to be fitted to sets of comparisons and results provided in a DataFrame format, with or without timings specified and then to predict the results of match-ups whether they have happened before or not.
 
