@@ -15,11 +15,11 @@ For each algorithm, the package offers a struct (Elo, Glicko, BT, WHR) to record
 
 All the algorithms take games in DataFrames format. They expect four or five columns (depending on whether the time of the match-up is included or not. The package expects the columns, in order:
 
-P1 = A unique identifier for Player 1 - the package expects an integer
-P2 = Same for Player 2
-P1Won = Number of games/points won by P1 on that day/match
-P2Won = Number of games/points won by P2 on that day/match
-Day = Integer giving a time period in which the match-ups took place (e.g., the number of day or week).
+* P1 = A unique identifier for Player 1 - the package expects an integer
+* P2 = Same for Player 2
+* P1Won = Number of games/points won by P1 on that day/match
+* P2Won = Number of games/points won by P2 on that day/match
+* Day = Integer giving a time period in which the match-ups took place (e.g., the number of day or week).
 
 The titles of the columns do not matter, just the order given above.
 
