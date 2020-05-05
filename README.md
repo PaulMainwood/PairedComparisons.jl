@@ -9,7 +9,7 @@ A Julia package implementing methods of rating entities based on win-loss compar
 
 The package allows each algorithm to be fitted to sets of comparisons and results provided in a DataFrame format, with or without timings specified and then to predict the results of match-ups whether they have happened before or not.
 
-For each algorithm, the package offers a struct (Elo, Glicko, TS, BT, WHR) to record the state of the paired comparison. This is built from the parameters of the algorithm, and the ratings assigned to each player.
+For each algorithm, the package offers a struct (Elo, Glicko, BT, WHR) to record the state of the paired comparison. This is built from the parameters of the algorithm, and the ratings assigned to each player.
 
 ## Usage
 
