@@ -66,20 +66,6 @@ function update_player_rating(player::Int64, opponents, player_wins, opponent_wi
     return r_updated, RD_updated
 end
 
-#Predicts with one-ahead for each day
-function one_ahead!(m::Glicko, games::DataFrame; prediction_function = predict)
-    sort!(games, 5)
-    predictions = Float64[]
-    #Split into days which are then predicted ahead of time
-    for day_games in groupby(games, 5)
-        day_games = DataFrame(day_games)
-        p = prediction_function.(Ref(m), day_games[!, 1], day_games[!, 1])
-        predictions = vcat(predictions, p)
-        fit!(m, day_games)
-    end
-    return predictions
-end
-
 #Returns the predicted result for any two players in the existing Elo rating dictionary
 function predict(m::Glicko, i::Integer, j::Integer)
     r, RD = get(m.ratings, i, m.default_rating)

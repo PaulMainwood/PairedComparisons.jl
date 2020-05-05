@@ -67,7 +67,6 @@ function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool=true)
 	println("Added ", games_added, " new games out of ", length(P1))
 	println("Added ", players_added, " new players.")
 	#return unique(players_to_iterate)
-
 end
 
 function add_player!(whr::WHR, player::Int)
@@ -279,48 +278,6 @@ function gradient(lld, s2, playerratings)
 	difference = diff(playerratings)
 	prior = vcat(difference ./ s2, 0.0) - vcat(0.0, difference ./ s2)
 	return lld .+ prior
-end
-
-
-#Predict games one day at a time, then add and rescan
-function one_ahead!(whr::WHR, games::DataFrame; prediction_function = predict, iterations_players::Int64 = 0, iterations_all::Int64 = 1, show_ll::Bool = false)
-    sort!(games, 5)
-    predictions = Float64[]
-
-    #Split into days which are then predicted ahead of time
-    for day_games in groupby(games, 5)
-		p = Float64[]
-		day =
-        day_games = DataFrame(day_games)
-		#println("Day number ", day_games.Day[1])
-
-		#use chosen prediction function to give predictions for day
-
-		p = prediction_function.(Ref(whr), day_games[!, 1], day_games[!, 2]; rating_day = day_games[1, 5])
-
-		#Add the predictions to the array of one-ahead
-        predictions = vcat(predictions, p)
-
-				#Iterate to fit - first on players who played on that day, then on all
-		add_games!(whr, day_games, dummy_games = true)
-
-		if show_ll
-			println("Before iterating LL = : ", loglikelihood(whr))
-		end
-
-		if iterations_players != 0
-			iterate!(whr, unique(vcat(day_games.P1, day_games.P2)), iterations_players)
-		end
-
-		if iterations_all != 0
-        	iterate!(whr, iterations_all, exclude_non_ford = false)
-		end
-
-		if show_ll
-			println("After iterating LL = : ", loglikelihood(whr))
-		end
-    end
-    return predictions
 end
 
 function check_ford(whr::WHR)

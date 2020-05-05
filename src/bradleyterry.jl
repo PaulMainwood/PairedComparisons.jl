@@ -78,15 +78,6 @@ function iterate!(bt::BradleyTerry, iterations::Int64, players)
 	end
 end
 
-#Scale average of ratings back to 1.0
-function normalise!(ratingsdict)
-	average_rating = mean(rating for (player, rating) in ratingsdict)
-	println(average_rating)
-	for (k, v) in ratingsdict
-    	ratingsdict[k] = v / average_rating
-	end
-end
-
 #Update function allowing for period in which there may be duplicate games
 function update_rating(bt::BradleyTerry, player::Int64)
 	p = sum(w for (_, _, w, _) in bt.playergames[player])
@@ -120,32 +111,13 @@ function zermelement(bt::BradleyTerry, i::Int64, j::Int64)
 	return Nij / (get(bt.rating, i, bt.default_rating) + get(bt.rating, j, bt.default_rating))
 end
 
-#Predict games one day at a time, then add and rescan
-function one_ahead!(bt::BradleyTerry, games::DataFrame, iterations_players::Int64, iterations_all::Int64)
-    sort!(games, :Day)
-    predictions = Float64[]
-    #Split into days which are then predicted ahead of time
-    for day_games in groupby(games, :Day)
-        day_games = DataFrame(day_games)
-		println("Day number ", day_games[1, 4])
-        p = predict.(Ref(bt), day_games[:, :P1], day_games[:, :P2])
-        predictions = vcat(predictions, p)
-
-		#Add the new games and iterate to fit - first on players who played on that day, then on all
-		add_games!(bt, day_games)
-		#iterate!(bt, iterations_players, vcat(day_games.P1, day_games.P2))
-        iterate!(bt, iterations_all)
-    end
-    return predictions
-end
-
 function predict(bt::BradleyTerry, P1::Int64, P2::Int64)
 	#Generate standard Bradley Terry probability for P1 winning a game
 	return get(bt.rating, P1, bt.default_rating) / (get(bt.rating, P1, bt.default_rating) + get(bt.rating, P2, bt.default_rating))
 end
 
 function check_ford(bt::BradleyTerry)
-	#Check for players who have either never won or never lost
+	#Check for players who have either never won or never lost - the Ford criterion
 	unconnected = []
 	for (player, games) in bt.playergames
 		if length(filter(y -> y[3] == 0.0, games)) == 0
