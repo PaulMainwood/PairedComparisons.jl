@@ -25,7 +25,7 @@ The titles of the columns do not matter, just the order given above.
 
 If you omit the "Day" column, there is a special "fast" version of the elo algorithm that treats each line as a separate time period and rates in the order given in the dataframe. The other algorithms need a time period and will error out if it is missed out.
 
-So in the below, games1 is valid input for the Elo alogithm 
+So in the below, games1 is valid, though boring input for the Elo alogithm, and games2 is needed for the others.
 
 ```
 games1 = DataFrame(Player1 = [1], Player2 = [2], Player1Wins = [1], Player2Wins = [0])
@@ -76,6 +76,4 @@ elo = Elo()
 fit!(elo, training_games)
 one_ahead!(elo, testing_games)
 ```
-Output is a vector of probabilities, predicted one time period-ahead, for all the games provided in the testing_games set.
-
-
+Output is a vector of probabilities, all predicted one time period ahead, for all the games provided in the testing_games data frame.
