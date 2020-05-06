@@ -1,15 +1,15 @@
 # PairedComparisons
 
-A Julia package implementing methods of rating entities based on win-loss comparisons between them. At present, it contains implementations of:
+A Julia package implementing methods of rating entities (players) based on win-loss comparisons (games) between them. At present, it contains implementations of:
 
 - Elo (Arpad Elo's system: https://en.wikipedia.org/wiki/Elo_rating_system)
 - Glicko (Mark Glickman's system: http://www.glicko.net/research/glicko.pdf)
 - Bradley-Terry (Zermelo's system, badly named: https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model)
 - Whole History Rating (Remi Coulom's time-drifting version of Bradley-Terry, https://www.remi-coulom.fr/WHR/WHR.pdf)
 
-The package allows each algorithm to be fitted to sets of comparisons and results provided in a DataFrame format, with or without timings specified and then to predict the results of match-ups whether they have happened before or not.
+The package allows each algorithm to be fitted to sets of games and their results provided in a DataFrame format, and then to predict the results of future games whether those two players have met before or not.
 
-For each algorithm, the package offers a struct (Elo, Glicko, BT, WHR) to record the current state, built from the parameters of the algorithm, and the ratings assigned to each player.
+For each algorithm, the package offers a struct (Elo, Glicko, BT, WHR) to record the current state, and the ratings assigned to each player.
 
 ## Usage
 
@@ -74,6 +74,6 @@ A convenience function is provided for each function to predict the results of e
 ```
 elo = Elo()
 fit!(elo, training_games)
-one_ahead!(elo, testing_games)
+one_ahead!(elo, testing_games, predict_algorithm = predict)
 ```
-Output is a vector of probabilities, all predicted one time period ahead, for all the games provided in the testing_games data frame.
+Output is a vector of probabilities, all predicted one time period ahead for all the games provided in the testing_games data frame. The predict algorithm defaults to the standard one for each algorithm, but you can also substitute your own.
