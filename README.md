@@ -74,6 +74,6 @@ A convenience function is provided for each function to predict the results of e
 ```
 elo = Elo()
 fit!(elo, training_games)
-one_ahead!(elo, testing_games)
+one_ahead!(elo, testing_games, predict_algorithm = predict)
 ```
-Output is a vector of probabilities, all predicted one time period ahead, for all the games provided in the testing_games data frame.
+Output is a vector of probabilities, all predicted one time period ahead for all the games provided in the testing_games data frame. The predict algorithm defaults to the standard one for each algorithm, but you can also substitute your own.
