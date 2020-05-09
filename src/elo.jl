@@ -59,21 +59,6 @@ function period_fit!(m::Elo, original_games::DataFrame)
     end
 end
 
-
-function one_ahead!(m::Elo, games::DataFrame; prediction_function = predict)
-    #Predicts with one-ahead for each day
-    sort!(games, 5)
-    predictions = Float64[]
-    #Split into days which are then predicted ahead of time
-    for day_games in groupby(games, 5)
-        day_games = DataFrame(day_games)
-        p = prediction_function.(Ref(m), day_games[:, 1], day_games[:, 2])
-        predictions = vcat(predictions, p)
-        fit!(m, day_games)
-    end
-    return predictions
-end
-
 function predict(m::Elo, i::Integer, j::Integer)
     #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
     return 1.0 / (1.0 + 10.0 ^ ((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating)) / 400.0))

@@ -9,6 +9,6 @@ include("bradleyterry.jl")
 include("WHR.jl")
 include("oneahead.jl")
 
-export Elo, Glicko, BradleyTerry, BT, WHR, fit!, one_ahead!, predict, iterate!, add_games!, loglikelihood
+export Elo, Glicko, BradleyTerry, BT, WHR, fit!, one_ahead!, predict, iterate!, add_games!, loglikelihood, brier, log_loss
 
 end # module

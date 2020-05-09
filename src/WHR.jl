@@ -346,7 +346,8 @@ function covariance(whr::WHR, player::Int64)
 	end
 	v[n] = -1 / d[n]
 
-	ev = -a .* v
+	ev = - a[2:n] .* v[1:n - 1]
+	
 	return Bidiagonal(v, ev, :U)
 end
 
