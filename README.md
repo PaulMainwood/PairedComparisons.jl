@@ -1,6 +1,6 @@
 # PairedComparisons
 
-A Julia package implementing methods of rating entities (players) based on win-loss comparisons (games) between them. At present, it contains implementations of:
+A Julia package implementing methods of rating entities ("players") based on win-loss comparisons between them ("games"). At present, the package contains implementations of:
 
 - Elo (Arpad Elo's system: https://en.wikipedia.org/wiki/Elo_rating_system)
 - Glicko (Mark Glickman's system: http://www.glicko.net/research/glicko.pdf)
@@ -13,17 +13,17 @@ For each algorithm, the package offers a struct (Elo, Glicko, BT, WHR) to record
 
 ## Usage
 
-All the algorithms take games in DataFrames format. They expect four or five columns (depending on whether the time of the match-up is included or not. The package expects the columns, in order:
+All the algorithms work on games provided in DataFrames format. They expect each set of games between two players four or five columns (depending on whether the time of the match-up is included or not. The package expects the columns, in order:
 
 * P1 = A unique identifier for Player 1 - the package expects an integer
 * P2 = Same for Player 2
 * P1Won = Number of games/points won by P1 on that day/match
 * P2Won = Number of games/points won by P2 on that day/match
-* Day = Integer giving a time period in which the match-ups took place (e.g., the number of day or week).
+* Rating period = Integer giving a time period in which the match-ups took place (e.g., the number of the day or week).
 
-The names given to these columns do not matter, but the package expects them in the order above.
+The names given to these columns do not matter, so long as they are in the order above.
 
-If you omit the "Day" column, there is a special "fast" version of the elo algorithm that treats each line as a separate time period and rates in the order given in the dataframe. The other algorithms need a time period and will error out if it is missed out.
+(Note: if you omit the "Rating period" column, only two of the algorithms will work. Elo will go to a special "fast" version of the algorithm which treats each line as a separate time period and rates in the order given in the dataframe. Bradley-Terry does not care about the timing of the games, and will give the same results whatever the ordering).
 
 So in the below, games1 is valid, though boring input for the Elo alogithm, and games2 is needed for the others.
 
@@ -76,4 +76,4 @@ elo = Elo()
 fit!(elo, training_games)
 one_ahead!(elo, testing_games, predict_algorithm = predict)
 ```
-Output is a vector of probabilities, all predicted one time period ahead for all the games provided in the testing_games data frame. The predict algorithm defaults to the standard one for each algorithm, but you can also substitute your own.
+Output is a vector of probabilities for the games provided in the testing_games data frame, all predicted one time period ahead of the actual result, before the algorithm is updated to the actual result. The predict algorithm defaults to the standard form for each algorithm, but you can also substitute your own (e.g., if you want to add offsets).
