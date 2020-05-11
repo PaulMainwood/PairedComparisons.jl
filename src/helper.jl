@@ -10,7 +10,7 @@ end
 
 function brier(predictions)
     withoutmissing = filter(!isnan, collect(skipmissing(predictions)))
-    return mean((1.0 .- withoutmissing).^2)
+    return sum((1.0 .- withoutmissing).^2) / length(withoutmissing)
 end
 
 function cumcount(m)

@@ -20,7 +20,7 @@ function one_ahead!(m::Glicko, games::DataFrame; prediction_function = predict)
     #Split into days which are then predicted ahead of time
     for day_games in groupby(games, 5)
         day_games = DataFrame(day_games)
-        p = prediction_function.(Ref(m), day_games[:, 1], day_games[:, 2])
+        p = prediction_function.(Ref(m), day_games[:, 1], day_games[:, 2], day_games[1, 5])
         predictions = vcat(predictions, p)
         fit!(m, day_games)
     end

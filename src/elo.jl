@@ -54,7 +54,7 @@ function period_fit!(m::Elo, original_games::DataFrame)
         day_games = DataFrame(day_games)
         day_games[!, :Predict] = predict.(Ref(m), day_games[:, 1], day_games[:, 2], day_games[:, 3], day_games[:, 4])
         #Groupby Player1 including results
-        aggregated_by_P1_games = by(day_games, 1, P1_wins = :P1_wins => sum, P2_wins = :P2_wins => sum, Predict = :Predict => sum)
+        aggregated_by_P1_games = combine(groupby(day_games, 1), :P1_wins => sum => :P1_wins, :P2_wins => sum => :P2_wins, :Predict => sum => :Predict)
         update!(m, aggregated_by_P1_games)
     end
 end

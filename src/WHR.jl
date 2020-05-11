@@ -9,7 +9,7 @@ struct WHR
 	w2::Float64
 end
 
-function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Array{Tuple{Int64, Float64}}}}(), default_rating = 0.0, w2 = 0.000454)
+function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Array{Tuple{Int64, Float64}}}}(), default_rating = 0.0, w2 = 0.000261)
 	return WHR(playerdayratings, playerdaygames, default_rating, w2)
 end
 
@@ -347,7 +347,7 @@ function covariance(whr::WHR, player::Int64)
 	v[n] = -1 / d[n]
 
 	ev = - a[2:n] .* v[1:n - 1]
-	
+
 	return Bidiagonal(v, ev, :U)
 end
 
