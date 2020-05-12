@@ -5,7 +5,7 @@ A Julia package implementing methods of rating entities ("players") based on win
 - Elo (Arpad Elo's system: https://en.wikipedia.org/wiki/Elo_rating_system)
 - Glicko (Mark Glickman's system: http://www.glicko.net/research/glicko.pdf)
 - Bradley-Terry (Zermelo's system, badly named: https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model)
-- Whole History Rating (Remi Coulom's time-drifting version of Bradley-Terry, https://www.remi-coulom.fr/WHR/WHR.pdf)
+- Whole History Rating (Remi Coulom's time-varying version of Bradley-Terry, https://www.remi-coulom.fr/WHR/WHR.pdf)
 
 The package allows each algorithm to be fitted to sets of games and their results provided in a DataFrame format, and then to predict the results of future games whether those two players have met before or not.
 
@@ -13,7 +13,7 @@ For each algorithm, the package offers a struct (Elo, Glicko, BT, WHR) to record
 
 ## Usage
 
-All the algorithms work on games provided in DataFrames format. They expect each set of games between two players four or five columns (depending on whether the time of the match-up is included or not. The package expects the columns, in order:
+All the algorithms work on sets of games provided in DataFrames format, with columns as follows:
 
 * P1 = A unique identifier for Player 1 - the package expects an integer
 * P2 = Same for Player 2
@@ -48,9 +48,14 @@ This package provides three main functions to work with incremental algorithms: 
 
 Example to start using an incremental algorithm:
 ```
-elo = Elo(kfac = 85.0, default_rating = 1500.0)  # A convenience function to start with an empty dictionary. Elo() provides some default values
-fit!(elo, games1) # Fit elo ratings given the games1 DataFrame (from above)
-predict(elo, 1, 2) # Give a probability for player 1 to beat player 2
+# Initialise a fresh Elo struct, with default values
+elo = Elo()  
+
+# Fit elo ratings given the games1 DataFrame (from above)
+fit!(elo, games1) 
+
+# Give a probability for player 1 to beat player 2
+predict(elo, 1, 2) 
 ```
 Glicko works exactly the same, but will need the DataFrame games2 as Glicko relies on ratings periods to work.
 
@@ -62,18 +67,21 @@ Global algorithms take account of all paired comparisons in a single sweep, and 
 
 This package provides slightly different functions to work with global algorithms: add_games!, iterate!, predict
 ```
-bt = BT(default_rating = 1.0)  # A convenience function to start with an empty dictionary. BT() provides some default values
-add_games!(bt, games2) # Add the game(s) from games2 to the Dict structure of players and games inside the Bradley-Terry object
+bt = BT()  
+
+# Add the game(s) from games2 to the Dict structure of players and games inside the Bradley-Terry object
+add_games!(bt, games2) 
+
 predict(bt, 1, 2) # Give a probability for player 1 to beat player 2
 ```
 
 ## One-ahead testing
 
-A convenience function is provided for each function to predict the results of each time period in advance of knowing the results, then fit the algorithm to that day, then iterate again. This is helpful when assessing the predictive performance of different algorithms. Typical use looks like this:
+A convenience function is provided for each function to predict the results of each time period in advance of knowing the results, then fit the algorithm to that day, then iterate again. This is helpful when assessing the predictive performance of different algorithms. Typical usage looks like this:
 
 ```
 elo = Elo()
 fit!(elo, training_games)
 one_ahead!(elo, testing_games, predict_algorithm = predict)
 ```
-Output is a vector of probabilities for the games provided in the testing_games data frame, all predicted one time period ahead of the actual result, before the algorithm is updated to the actual result. The predict algorithm defaults to the standard form for each algorithm, but you can also substitute your own (e.g., if you want to add offsets).
+Output from one_ahead is a vector of probabilities for the games provided in the testing_games data frame, all predicted one time period ahead of the actual result, before the algorithm is updated with the actual results. The predict algorithm defaults to the standard form for each algorithm, but you can also substitute your own.
