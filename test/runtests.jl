@@ -4,7 +4,7 @@ using DataFrames
 
 @testset "PairedComparisons.jl" begin
     # Elo tests
-    elo = Elo() # A standard Elo with k of 25 and default rating of 1500
+    elo = Elo(kfac = 25.0) # A standard Elo with k of 25 and default rating of 1500
 
     @test predict(elo, 1, 2) == 0.5
 
@@ -15,16 +15,16 @@ using DataFrames
     fit!(elo, games1)
 
     @test length(elo.ratings) == 2
-    @test abs(predict(elo, 1, 2) - 0.6199413) < 0.001
+    @test abs(predict(elo, 1, 2) - 0.5359159269451023) < 0.001
 
     #Glicko tests
-    glicko = Glicko()
+    glicko = Glicko(c = 85.0, default_rating = (1500.0, 350.0, -1))
 
-    @test predict(glicko, 1, 2) == 0.5
+    @test predict(glicko, 1, 2, 1) == 0.5
 
     fit!(glicko, games2)
     @test length(glicko.ratings) == 2
-    @test abs(predict(glicko, 1, 2) - 0.72720) < 0.001
+    @test abs(predict(glicko, 1, 2, 1) - 0.72720) < 0.001
 
     #BradleyTerry tests
     bt = BT()

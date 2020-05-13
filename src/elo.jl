@@ -5,7 +5,7 @@ struct Elo
     default_rating::Real
 end
 
-function Elo(;kfac = 85.0, ratings = Dict{Int64, Float64}(), default_rating = 1500.0)
+function Elo(;kfac = 0.31, ratings = Dict{Int64, Float64}(), default_rating = 0.0)
     #Set up a new Elo struct, either using key words or defaults if not provided
     return Elo(kfac, ratings, default_rating)
 end
@@ -14,14 +14,12 @@ end
 function fit!(m::Elo, games::DataFrame; verbose = false)
     #= Wrapper function to choose the right approach to fit a dataframe of games =#
     if size(games, 2) == 4
-        if verbose println("No periods found. Treating each game as a separate rating period and using fastelo algorithm.") end
+        verbose && println("No periods found. Treating each game as a separate rating period and using fastelo algorithm.")
         fast_fit!.(Ref(m), games[!, 1], games[!, 2], games[!, 3], games[!, 4])
     elseif size(games, 2) >= 5
         period_fit!(m, games[!, (1:5)])
     else throw(DomainError(games, "DataFrame must have at least four columns, P1_ID, P2_ID, P1_wins, P2_wins."))
     end
-
-return m
 end
 
 
@@ -45,6 +43,7 @@ function period_fit!(m::Elo, original_games::DataFrame)
     columns of a dataframe (P1, P2, P1_wins, P2_wins, Day) and gets rid of everything else.
     =#
     games = original_games[!, (1:5)]
+    
     #Duplicate whole rating dataframe with reversed results
     games = dupe_for_rating(games)
 
@@ -61,12 +60,12 @@ end
 
 function predict(m::Elo, i::Integer, j::Integer)
     #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
-    return 1.0 / (1.0 + 10.0 ^ ((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating)) / 400.0))
+    return 1.0 / (1.0 + exp((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating))))
 end
 
 function predict(m::Elo, i::Integer, j::Integer, P1_games, P2_games)
     #Returns the predicted result for any two players in the existing Elo rating dictionary, for multiple matches
-    return (P1_games + P2_games) / (1.0 + 10.0 ^ ((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating)) / 400.0))
+    return (P1_games + P2_games) / (1.0 + exp(get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating)))
 end
 
 function update!(m::Elo, games)

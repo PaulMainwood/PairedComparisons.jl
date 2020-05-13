@@ -6,15 +6,16 @@ struct WHR
 	playerdayratings::Dict
 	playerdaygames::Dict
 	default_rating::Float64
+	default_score::Float64
 	w2::Float64
 end
 
-function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Array{Tuple{Int64, Float64}}}}(), default_rating = 0.0, w2 = 0.000261)
-	return WHR(playerdayratings, playerdaygames, default_rating, w2)
+function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Array{Tuple{Int64, Float64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000261)
+	return WHR(playerdayratings, playerdaygames, default_rating, default_score, w2)
 end
 
 #Add games to an WHR object
-function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool=true)
+function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = true, verbose = true)
 
 	games = original_games[!, (1:5)]
     #Duplicate whole rating dataframe with reversed results
@@ -64,8 +65,8 @@ function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool=true)
 			nothing
 		end
 	end
-	println("Added ", games_added, " new games out of ", length(P1))
-	println("Added ", players_added, " new players.")
+	verbose && println("Added ", games_added, " new games out of ", length(P1))
+	verbose && println("Added ", players_added, " new players.")
 	#return unique(players_to_iterate)
 end
 
@@ -89,13 +90,13 @@ function add_dummy_games_whr!(whr::WHR, i::Int)
 		nothing
 	else
 		#if dummy games are not the first games, then add them
-		whr.playerdaygames[i][firstday] = vcat([(0, 1.0), (0, 0.0)], whr.playerdaygames[i][firstday])
+		whr.playerdaygames[i][firstday] = vcat([(0, whr.default_score), (0, 0.0)], whr.playerdaygames[i][firstday])
 		#if we have dummy games but they are not the first ones then Delete existing dummy games and create new ones
 		#ADD THIS. DOES NOT MATTER IF ALWAYS ADDING FUTURE GAMES BUT WILL MATTER LATER
 	end
 end
 
-function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001)
+function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001, verbose = true)
 
 	#Check and get rid of any players not Ford-connected
 
@@ -119,7 +120,7 @@ function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, d
 			end
 		#println(loglikelihood(bt, connected_players))
 		end
-		println("Iteration on whole WHR: ", i)
+		verbose && println("Iteration on whole WHR: ", i)
 	end
 end
 
@@ -255,12 +256,6 @@ end
 function sigma2(playerdays, w2::Float64, player::Int64)
 	#Vector of n-1 expressions for drift from the Weiner process between ndays in which the player plays games
 	return [w2 * (playerdays[i + 1] - playerdays[i]) for i in 1:(length(playerdays) - 1)]
-end
-
-function sigma2(playerdays, a::Float64, b::Float64, c::Float64, d::Float64, playerdobs::Dict, player::Int64)
-	#Sigma2 with declining w2 factor as player becomes more experienced
-	age_in_days = playerdays .- get(player_dobs, player, -3650)
-	return [a * (1.0 - b / (1.0 + exp(- c * (age_in_days[i + 1] - d)))) * (playerdays[i + 1] - playerdays[i]) for i in 1:(length(playerdays) - 1)]
 end
 
 function hessian(ll2d, s2; delta::Float64 = 0.001)
