@@ -46,7 +46,7 @@ function one_ahead!(bt::BradleyTerry, games::DataFrame; iterations_players::Int6
 end
 
 #Predict games one day at a time, then add and rescan
-function one_ahead!(whr::WHR, games::DataFrame; prediction_function = predict, iterations_players::Int64 = 0, iterations_all::Int64 = 1, show_ll::Bool = false)
+function one_ahead!(whr::WHR, games::DataFrame; prediction_function = predict, iterations_players::Int64 = 0, iterations_all::Int64 = 1, show_ll::Bool = false, verbose = true)
     sort!(games, 5)
     predictions = Float64[]
 
@@ -64,7 +64,7 @@ function one_ahead!(whr::WHR, games::DataFrame; prediction_function = predict, i
 		#Add the predictions to the array of one-ahead
         predictions = vcat(predictions, p)
 
-		add_games!(whr, day_games, dummy_games = true)
+		add_games!(whr, day_games, dummy_games = true, verbose = verbose)
 
 		if show_ll
 			println("Before iterating LL = : ", loglikelihood(whr))
@@ -75,7 +75,7 @@ function one_ahead!(whr::WHR, games::DataFrame; prediction_function = predict, i
 		end
 
 		if iterations_all != 0
-        	iterate!(whr, iterations_all, exclude_non_ford = false)
+        	iterate!(whr, iterations_all, exclude_non_ford = false, verbose = verbose)
 		end
 
 		if show_ll
