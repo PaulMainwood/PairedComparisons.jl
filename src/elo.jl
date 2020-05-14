@@ -1,3 +1,18 @@
+##############################################################################################################################################
+# Implements the Elo algorithm as published by Arpad Elo in the 1960s. 
+# Two differences from the standard implementations. first, the scores are done with natural powers rather than the common Elo style of base
+# ten and a scaling of 400 points. To get back, you use.
+#
+# Natural = Elo_style * ln(10) / 400
+#
+# In addition, Elo are traditionally started at 1000, where in this case, we set zero as the default rating (so negative scores are possible.)
+# 
+# The second difference is the implementation of time periods, which matches Elo's original approach - re-rating each time period or tournament
+# rather than treating each game separately. You can recover the more common game-by-game approach by simply omitting the time period column.
+# This algorithm is also much faster (fast_fit!, below)
+##############################################################################################################################################
+
+
 #Struct is an Elo object - in this version it's a dict and a base kfactor
 struct Elo
     kfac::Real

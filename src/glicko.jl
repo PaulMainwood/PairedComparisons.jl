@@ -1,3 +1,15 @@
+##############################################################################################################################################
+# Implements the Glicko algorithm from Mark Glickman as outlined in the papers: http://www.glicko.net/glicko/glicko.pdf (short version)
+# and http://www.glicko.net/research/glicko.pdf (technical version).
+# In both cases, the original papers use an artificial point scale for comparability with the Elo system, which complicates the calaculations
+# considerably. In the below, we are using natural ratings, which can be related back to the Elo scale by a simple scaling factor.
+#
+# Natural = Elo_style * ln(10) / 400
+#
+# In addition, Elo are traditionally started at 1000, where in this case, we set zero as the default rating (so negative scores are possible.)
+# This is in keeping with the rest of this package, including the Elo.
+##############################################################################################################################################
+
 struct Glicko
     c::Float64
     default_rating::Tuple{Float64, Float64, Int64}

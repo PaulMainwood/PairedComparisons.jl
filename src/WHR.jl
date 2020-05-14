@@ -1,3 +1,12 @@
+##############################################################################################################################################
+# Implements the Whole History Rating algorithm from Remi Coulom as outlined in the paper: https://www.remi-coulom.fr/WHR/WHR.pdf
+#
+# The "predict" function is mine, based on my understanding of the algorithm. It gives good results, but I have not checked it with the paper
+# and it does not match algorithms given elsewhere (e.g., in the Ruby implementation here: https://github.com/goshrine/whole_history_rating)
+#
+# This algorithm is also several orders of magnitude faster than the open-source versions (Ruby, Python) I have seen.
+##############################################################################################################################################
+
 import Distributions
 import QuadGK
 using LinearAlgebra
