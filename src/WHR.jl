@@ -4,7 +4,7 @@
 # The "predict" function is mine, based on my understanding of the algorithm. It gives good results, but I have not checked it with the paper
 # and it does not match algorithms given elsewhere (e.g., in the Ruby implementation here: https://github.com/goshrine/whole_history_rating)
 #
-# This algorithm is also several orders of magnitude faster than the open-source versions (Ruby, Python) I have seen.
+# This algorithm is also several orders of magnitude faster than the open-source versions (Ruby, Python).
 ##############################################################################################################################################
 
 import Distributions
@@ -105,7 +105,7 @@ function add_dummy_games_whr!(whr::WHR, i::Int)
 	end
 end
 
-function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001, verbose = true)
+function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001, verbose = true, show_ll = false, ll_every = 1)
 
 	#Check and get rid of any players not Ford-connected
 
@@ -130,6 +130,13 @@ function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, d
 		#println(loglikelihood(bt, connected_players))
 		end
 		verbose && println("Iteration on whole WHR: ", i)
+
+
+		if show_ll 
+			if i % ll_every  == 0
+				println("Log likelihood = ", loglikelihood(whr))
+			end
+		end
 	end
 end
 
@@ -381,7 +388,7 @@ function rating(whr::WHR, player::Int64, day::Int64)
 	return whr.playerdayratings[player][day], uncertainty(whr, player)[day]
 end
 
-function predict(whr::WHR, P1::Int64, P2::Int64; rating_day = missing)
+function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing)
 	#Predict with logitnormal distribution, pulling forward the variance to the rating day (default, present day)
 
 	if !haskey(whr.playerdaygames, P1)
@@ -414,15 +421,31 @@ function predict(whr::WHR, P1::Int64, P2::Int64; rating_day = missing)
 		r2, var2_lastday = rating(whr, P2, lastdayP2)
 		var2 = var2_lastday + (abs(rating_day - lastdayP2) * whr.w2)
 	end
+	
 	#Difference between two normally distributed RVs is normally distributed with mean of the difference of the two means, and variance as sum of the variances.
-	#For the probability we are looking for the logistic function of this normal distribution: given by the mean of the logit-normal (I hope).
-	return mean_logitnormal(r1 - r2, var1 + var2)
+	#For the probability, we are looking for the logistic function of this normal distribution: given by the mean of the logit-normal (I hope).
+	#Using approximation here with series of 10 terms
+	return mean_logitnormal_approx(r1 - r2, var1 + var2, 10)
 end
 
 function mean_logitnormal(mu, var)
-	#Returns the mean of the logitnormal. No analytic way, so using Gaussian
-	#quadrature. Can be made much faster with approximations, but not a performance-critical piece (I hope).
+	#Returns the mean of the logitnormal. No analytic way, so using Gaussian quadrature
+	#Can be made much faster with approximations, but not a performance-critical piece (I hope).
 	dist = Distributions.LogitNormal(mu, sqrt(var))
 	prob_win = QuadGK.quadgk(x -> x * Distributions.pdf(dist, x), 0, 1)[1]
     return prob_win
+end
+
+function mean_logitnormal_approx(mu, var, K)
+	#Approximate function for logitnormals - about 1000 times faster and also more stable than numerical quadrature
+    cumulative = 0.0
+    d = Distributions.Normal(mu, var)
+    for i in 1:K-1
+        cumulative += std_logistic(Distributions.quantile(d, i/K))
+    end
+    return cumulative / (K-1)
+end
+
+function std_logistic(x)
+    return 1 / (1 + exp(-x))
 end

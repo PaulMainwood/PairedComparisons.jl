@@ -48,7 +48,7 @@ function RD_drift(RD, c, defaultRD, day, last_rated)
     if last_rated < 0
         return defaultRD
     else
-        return min(sqrt(RD^2 + ((c^2) * (day - last_rated))), defaultRD)
+        return min(sqrt(RD^2 + ((c^2) * abs(day - last_rated))), defaultRD)
     end
 end
 
@@ -85,7 +85,7 @@ function update_player_rating(glicko::Glicko, day::Int64, player::Int64, opponen
     return (r_updated, RD_updated, day)
 end
 
-#Returns the predicted result for any two players in the existing Elo rating dictionary
+#Returns the predicted result for any two players in the existing Glicko rating dictionary
 function predict(m::Glicko, i::Integer, j::Integer, day::Integer)
     r, RD, last_rated = get(m.ratings, i, m.default_rating)
     rj, RDj, last_rated_j = get(m.ratings, j, m.default_rating)

@@ -8,12 +8,23 @@ function dupe_for_rating(games)
     return sort!(vcat(original, dupe_backwards), :Day)
 end
 
-function brier(predictions)
-    withoutmissing = filter(!isnan, collect(skipmissing(predictions)))
-    return sum((1.0 .- withoutmissing).^2) / length(withoutmissing)
+function brier(predictions; true_scores = missing)
+    #Brier score
+    #withoutmissing = filter(!isnan, collect(skipmissing(predictions)))
+    if ismissing(true_scores)
+        return sum((1.0 .- predictions).^2) / length(predictions)
+    else
+        return sum((true_scores .- predictions).^2 / length(predictions))
+    end
+end
+
+function brierss(predictions)
+    #Brier skill score -- compares to unskilled = (1-0.5)^2 forecast.
+    return 1 - (brier(predictions) / 0.25)
 end
 
 function cumcount(m)
+    #Cumulative count occurrences
     d = Dict()
     function g(a)
         d[a] = get(d, a, 0) + 1
