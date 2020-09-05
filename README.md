@@ -67,12 +67,16 @@ Global algorithms take account of all paired comparisons in a single sweep, and 
 
 This package provides slightly different functions to work with global algorithms: add_games!, iterate!, predict
 ```
-bt = BT()  
+whr = WHR()  
 
 # Add the game(s) from games2 to the Dict structure of players and games inside the Bradley-Terry object
-add_games!(bt, games2) 
+add_games!(whr, games2) 
 
-predict(bt, 1, 2) # Give a probability for player 1 to beat player 2
+# Optimise the fit using a tailored algorithm (a Newton-Raphson method for WHR) to the games, with 10 iterations
+iterate!(whr, 10)
+
+# Give a probability for player 1 to beat player 2
+predict(whr, 1, 2) 
 ```
 
 ## One-ahead testing
