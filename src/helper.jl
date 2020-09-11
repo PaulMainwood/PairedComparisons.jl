@@ -2,20 +2,41 @@
 #Helper functions for ratings RatingSystems - duplicating, getting games already played etc
 
 function dupe_for_rating(games)
-    #Takes dataframe of games and predictions, reverses the players, result and prediction and appends them to end
-    original = rename(games, [:P1, :P2, :P1_wins, :P2_wins, :Day], makeunique = true)
-    dupe_backwards = rename(games, [:P2, :P1, :P2_wins, :P1_wins, :Day], makeunique = true)
-    return sort!(vcat(original, dupe_backwards), :Day)
+    #Takes dataframe of games and predictions, reverses the players, result and prediction and appends them to end#
+    #Also adds handicap and var columns if not already there#
+
+    dupe_backwards = rename(games, :P1 => :P2, :P2 => :P1, :P1_wins => :P2_wins, :P2_wins => :P1_wins)
+
+    duplicated_games = vcat(games, dupe_backwards)
+
+    if in("Handicap", names(games))
+        dupe_backwards_handicap = - games.Handicap
+        duplicated_games.Handicap = vcat(games.Handicap, dupe_backwards_handicap)
+    else
+        duplicated_games.Handicap = 0.0
+    end
+
+    if in("Var", names(games))
+        dupe_backwards_var = games.Var
+        duplicated_games.Var = vcat(games.Var, dupe_backwards_var)
+    else
+        duplicated_games.Var = 0.0
+    end
+
+    sort!(duplicated_games, :Period)
+
+    return duplicated_games
 end
 
-function brier(predictions; true_scores = missing)
-    #Brier score
-    #withoutmissing = filter(!isnan, collect(skipmissing(predictions)))
-    if ismissing(true_scores)
-        return sum((1.0 .- predictions).^2) / length(predictions)
-    else
-        return sum((true_scores .- predictions).^2 / length(predictions))
-    end
+function brier(predictions)
+    #Brier score simple (versus all-wins)
+    withoutmissing = filter(!isnan, collect(skipmissing(predictions)))
+    return sum((1.0 .- withoutmissing).^2) / length(collect(skipmissing(predictions)))
+end
+
+function brier(predictions, true_scores)
+    #Brier score with actual scores comparison
+    return sum(collect(skipmissing(true_scores .- predictions).^2)) / length(collect(skipmissing(predictions)))
 end
 
 function brierss(predictions)
@@ -45,8 +66,19 @@ function cumcount(m, surface)
     return g.(m, surface)
 end
 
+function actual_scores(games)
+    function score_safe(x, y)
+        if x + y == 0
+            return 0.5
+        else
+            return x / (x+y)
+        end
+    end
+    return score_safe.(games.P1_wins, games.P2_wins)
+end
+
 function games_previously_played_count(training_games, testing_games)
-    m = hcat(vcat(training_games[!, 1], testing_games[!, 1]), vcat(training_games[!, 2], testing_games[!, 2]))
+    m = hcat(vcat(training_games.P1, testing_games.P2), vcat(training_games.P2, testing_games.P1))
     flattened = collect(Iterators.flatten(transpose(m)))
     counts = cumcount(flattened)
     return transpose(reshape(counts, 2, :))
@@ -110,4 +142,46 @@ function order_by_recency(games::DataFrame)
     P1 = vcat(games.P1)
     P2 = vcat(games.P2)
     return reverse(unique(transpose(hcat(P1, P2))))
+end
+
+function change_in_surface(training_games::DataFrame, testing_games::DataFrame, surface_training, surface_testing)
+    m = hcat(vcat(training_games.P1, testing_games.P2), vcat(training_games.P2, testing_games.P1))
+    flattened = collect(Iterators.flatten(transpose(m)))
+
+    s = hcat(vcat(surface_training, surface_testing), vcat(surface_training, surface_testing))
+    flattened_surface = collect(Iterators.flatten(transpose(s)))
+
+    last_surface_played = transpose(reshape(last_surface(flattened, flattened_surface), 2, :)) 
+    return .!isequal.(s, last_surface_played)
+end
+
+function last_surface(m, s)
+    #Return the last surface and 
+    d = Dict()
+    function g(a, s)
+        b = get(d, a, s)
+        d[a] = s
+        return b
+    end
+    return g.(m, s)
+end
+
+
+function jumble(predictions)
+    #Run through and reverse half the games for ratings assessment
+    l = length(predictions)
+    true_scores = ones(Float64, l)
+    jumbled_predictions = ones(Float64, l)
+    
+    for row in 1:l
+        
+        if isodd(row)
+            jumbled_predictions[row] = 1.0 - predictions[row]
+            true_scores[row] = 0.0
+        else
+            jumbled_predictions[row] = predictions[row]
+            true_scores[row] = 1.0
+        end
+    end
+    return jumbled_predictions, true_scores
 end
