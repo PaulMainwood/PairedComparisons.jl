@@ -17,18 +17,18 @@ All the algorithms work on sets of games provided in DataFrames format, with col
 
 * P1 = A unique identifier for Player 1 - the package expects an integer
 * P2 = Same for Player 2
-* P1Won = Number of games/points won by P1 on that day/match
-* P2Won = Number of games/points won by P2 on that day/match
-* Rating period = Integer giving a time period in which the match-ups took place (e.g., the number of the day or week).
+* P1_wins = Number of games/points won by P1 on that day/match
+* P2_wins = Number of games/points won by P2 on that day/match
+* Period = Integer giving a time period in which the match-ups took place (e.g., the number of the day or week).
 
-The names given to these columns do not matter, so long as they are in the order above.
+The order of the columns do not matter, so long as they have these names. You can also have other columns, which will be ignored.
 
 (Note: if you omit the "Rating period" column, only two of the algorithms will work. Elo will go to a special "fast" version of the algorithm which treats each line as a separate time period and rates in the order given in the dataframe. Bradley-Terry does not care about the timing of the games, and will give the same results whatever the ordering).
 
-So in the below, games1 is valid, though boring input for the Elo alogithm, and games2 is needed for the others.
+So in the below, games1 is valid (rather boring) input for the Elo alogithm, but is invalid for the others. games2 is valid for all.
 
 ```
-games1 = DataFrame(Player1 = [1], Player2 = [2], Player1Wins = [1], Player2Wins = [0])
+games1 = DataFrame(Player1 = [1], Player2 = [2], P1_wins = [1], P1_wins = [0])
 games2 = copy(games1)
 games2.Day = [1]
 ```
