@@ -108,23 +108,10 @@ function recent_players(games::DataFrame, recent_days::Int)
     return unique(vcat(games_played_recently.P1, games_played_recently.P2))
 end
 
-function log_loss(predictions)
-    withoutmissing = filter(!isnan, collect(skipmissing(predictions)))
-    ll = -sum([log(prediction) for prediction in withoutmissing]) / length(withoutmissing)
-    return ll
-end
+function log_loss(predicted, actual; tol = 0.001)
 
-function log_loss(predictions, lower)
-    tally = 0
-    log_total = 0.0
-    for row in 1:length(predictions[1])
-        if (predictions[2][row] >= lower) & (predictions[3][row] >= lower) & (!ismissing(predictions[1][row])) & (!isnan(predictions[1][row]))
-            tally += 1
-            log_total += log(predictions[1][row])
-        end
-    end
-    ll = - log_total / tally
-    return ll, tally
+	predicted = min.(max.(predicted, tol), 1 .- tol)
+	return -1.0 * (sum(actual .* log.(predicted) + (1 .- actual) .* log.(1 .- predicted))) / length(actual)
 end
 
 function add_blanks(playerdayratings::Dict)
@@ -156,7 +143,7 @@ function change_in_surface(training_games::DataFrame, testing_games::DataFrame, 
 end
 
 function last_surface(m, s)
-    #Return the last surface and 
+    #Return the last surface and update
     d = Dict()
     function g(a, s)
         b = get(d, a, s)

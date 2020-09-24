@@ -27,17 +27,17 @@ function fit!(glicko::Glicko, original_games::DataFrame)
     games = original_games[!, (1:5)]
 
     #Duplicate whole rating dataframe with reversed results
-    games = dupe_for_rating(games)
+    games_duped = dupe_for_rating(games)
 
     #Split into days and deal with all players in them separately
-    for day_games in groupby(games, 5)
+    for day_games in groupby(games_duped, :Period)
         #Add glicko predictions to each day
         day_games = DataFrame(day_games)
-        day = day_games[1, 5]
+        day = day_games.Period[1]
 
         #Groupby Player1 including results
-        for player_day_games in groupby(day_games, 1)
-            player = player_day_games[1, 1]
+        for player_day_games in groupby(day_games, :P1)
+            player = player_day_games.P1[1]
             glicko.ratings[player] = update_player_rating(glicko, day, player, player_day_games[!, 2], player_day_games[!, 3], player_day_games[!, 4])
         end
     end
@@ -86,15 +86,15 @@ function update_player_rating(glicko::Glicko, day::Int64, player::Int64, opponen
 end
 
 #Returns the predicted result for any two players in the existing Glicko rating dictionary
-function predict(m::Glicko, i::Integer, j::Integer, day::Integer)
+function predict(m::Glicko, i::Integer, j::Integer; rating_day::Integer = 0)
     r, RD, last_rated = get(m.ratings, i, m.default_rating)
     rj, RDj, last_rated_j = get(m.ratings, j, m.default_rating)
 
-    if day > last_rated
-        RD = RD_drift(RD, m.c, m.default_rating[2], day, last_rated)
+    if rating_day > last_rated
+        RD = RD_drift(RD, m.c, m.default_rating[2], rating_day, last_rated)
     end
-    if day > last_rated_j
-        RDj = RD_drift(RDj, m.c, m.default_rating[2], day, last_rated_j)
+    if rating_day > last_rated_j
+        RDj = RD_drift(RDj, m.c, m.default_rating[2], rating_day, last_rated_j)
     end
     return 1 / (1 + exp(g(sqrt(RDj^2 + RD^2)) * (rj - r)))
 end

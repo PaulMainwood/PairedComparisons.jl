@@ -10,6 +10,8 @@
 import Distributions
 import QuadGK
 using LinearAlgebra
+using IJulia
+import SLEEF
 
 struct WHR
 	playerdayratings::Dict
@@ -19,17 +21,16 @@ struct WHR
 	w2::Float64
 end
 
-function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Array{Tuple{Int64, Float64, Float64, Float64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
+function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Array{Tuple{Int64, Float64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
 	return WHR(playerdayratings, playerdaygames, default_rating, default_score, w2)
 end
 
 #Add games to an WHR object
-function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = true, verbose = true)
+function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = true, verbose = false)
 
-    #Duplicate whole rating dataframe with reversed results
+    #Duplicate whole of new games rating dataframe with reversed results
 	games = dupe_for_rating(original_games)
-
-	P1, P2, P1_wins, P2_wins, Day, Handicap, Var = games.P1, games.P2, games.P1_wins, games.P2_wins, games.Period, games.Handicap, games.Var
+	P1, P2, P1_wins, P2_wins, Day = games.P1, games.P2, games.P1_wins, games.P2_wins, games.Period
 
 	games_added = 0
 	players_added = 0
@@ -41,7 +42,7 @@ function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = tru
 
 			add_player!(whr::WHR, P1[row])
 			add_gameday!(whr::WHR, P1[row], Day[row])
-			whr.playerdaygames[P1[row]][Day[row]] = vcat([(P2[row], 1.0, 0.0, 0.0) for i in 1:P1_wins[row]], [(P2[row], 0.0, 0.0, 0.0) for j in 1:P2_wins[row]])
+			whr.playerdaygames[P1[row]][Day[row]] = vcat([(P2[row], 1.0) for i in 1:P1_wins[row]], [(P2[row], 0.0) for j in 1:P2_wins[row]])
 			games_added += 1
 			#Add dummy games if toggle is on
 			if dummy_games
@@ -57,17 +58,12 @@ function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = tru
 		end
 
 		#Now add the game to the appropriate gameday for the appropriate player
-		#Terms of tupe are:
+		#Terms of tuple are:
 		# 1: Index of opponent
 		# 2: Win or loss 1.0 vs 0.0, with potential for 0.5 or other scores if required for other applications
-		# 3: Handicap in natural ratings (+ve gives an advantage to player 1)
-		# 4: "Handicap" to uncertainty (i.e., extra to add to w2). Used if we know that this game is especially uncertain for some reason.
 
 		
-		handicap_element = Handicap[row]
-		var_element = Var[row]
-		
-		new_games = vcat([(P2[row], 1.0, handicap_element, var_element) for i in 1:P1_wins[row]], [(P2[row], 0.0, handicap_element, var_element) for j in 1:P2_wins[row]])
+		new_games = vcat([(P2[row], 1.0) for i in 1:P1_wins[row]], [(P2[row], 0.0) for j in 1:P2_wins[row]])
 		destination = whr.playerdaygames[P1[row]][Day[row]]
 
 		#Check games are not already there, and if not add them and count them
@@ -104,13 +100,13 @@ function add_dummy_games_whr!(whr::WHR, i::Int)
 		nothing
 	else
 		#if dummy games are not the first games, then add them
-		whr.playerdaygames[i][firstday] = vcat([(0, whr.default_score, 0.0, 0.0), (0, 0.0, 0.0, 0.0)], whr.playerdaygames[i][firstday])
+		whr.playerdaygames[i][firstday] = vcat([(0, whr.default_score,), (0, 0.0)], whr.playerdaygames[i][firstday])
 		#if we have dummy games but they are not the first ones then Delete existing dummy games and create new ones
 		#ADD THIS. DOES NOT MATTER IF ALWAYS ADDING FUTURE GAMES BUT WILL MATTER LATER
 	end
 end
 
-function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001, verbose = true, show_ll = false, ll_every = 1)
+function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001, verbose = false, show_ll = false, ll_every = 1)
 
 	#Check and get rid of any players not Ford-connected
 
@@ -185,10 +181,9 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float64 = 0.001)
 
 	playerdays = sort(unique(collect(keys(whr.playerdaygames[player])))) #All the days the player played
 	playerratings = [whr.playerdayratings[player][day] for day in playerdays] #The old rating the player had on those days
-	vars = map(x -> whr.playerdaygames[player][x][1][4], playerdays) #Any manually inputted extra variance to be expected on those days (takes from first game of day only)
 
 	#Get the sigma2 vector
-	s2 = sigma2(playerdays, whr.w2, player, vars)
+	s2 = sigma2(playerdays, whr.w2, player)
 
 	#Obtain the log likelihood derivative and second derivative at one sweep
 	lld, ll2d = llderivatives(whr, player, playerdays)
@@ -229,13 +224,13 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	lld_tally = 0.0
 	ll2d_tally = 0.0
 	win_tally = 0.0
-	a = exp(get(whr.playerdayratings[player], day, 0.0))
+	a = SLEEF.exp(get(whr.playerdayratings[player], day, 0.0))
 
-	for (opponent, result, handicap, add_uncertainty) in whr.playerdaygames[player][day]
+	for (opponent, result) in whr.playerdaygames[player][day]
 		if opponent == 0
 			b = 1.0
 		else
-			b = exp(get(whr.playerdayratings[opponent], day, 0.0) - handicap)
+			b = SLEEF.exp(get(whr.playerdayratings[opponent], day, 0.0))
 		end
 		win_tally += result
 		lld_tally += 1.0 / (a + b)
@@ -249,11 +244,11 @@ function llelements(whr, player::Int64, day::Int64)
 	ll_tally = 0.0
 	own_rating = get(whr.playerdayratings[player], day, 0.0)
 
-	for (opponent, result, handicap, add_uncertainty) in whr.playerdaygames[player][day]
+	for (opponent, result) in whr.playerdaygames[player][day]
 		if opponent == 0
 			opponent_rating = 1.0
 		else
-			opponent_rating = get(whr.playerdayratings[opponent], day, 0.0) - handicap
+			opponent_rating = get(whr.playerdayratings[opponent], day, 0.0)
 		end
 		ll_tally += result * own_rating + ((1 - result) * opponent_rating) - log(exp(own_rating) + exp(opponent_rating))
 	end
@@ -275,9 +270,9 @@ function log_likelihood(whr::WHR)
 end
 
 
-function sigma2(playerdays, w2::Float64, player::Int64, var)
+function sigma2(playerdays, w2::Float64, player::Int64)
 	#Vector of n-1 expressions for drift from the Weiner process between ndays in which the player plays games
-	return [abs(w2) * (playerdays[i + 1] - playerdays[i] + var[i + 1]) for i in 1:(length(playerdays) - 1)]
+	return [abs(w2) * (playerdays[i + 1] - playerdays[i]) for i in 1:(length(playerdays) - 1)]
 end
 
 function hessian(ll2d, s2; delta::Float64 = 0.001)
@@ -316,9 +311,8 @@ function covariance(whr::WHR, player::Int64)
 	#Following Appendix B in the WHR paper -- there's almost certainly a better way to do this in Julia
 	playerdays = sort(unique(collect(keys(whr.playerdaygames[player]))))
 	playerratings = [whr.playerdayratings[player][day] for day in playerdays]
-	vars = map(x -> whr.playerdaygames[player][x][1][4], playerdays) #Any manually inputted extra variance to be expected on those days (takes from first game of day only)
 
-	s2 = sigma2(playerdays, whr.w2, player, vars)
+	s2 = sigma2(playerdays, whr.w2, player)
 	lld, ll2d = llderivatives(whr, player, playerdays)
 	h = hessian(ll2d, s2)
 	g = gradient(lld, s2, playerratings)
@@ -395,15 +389,8 @@ function rating(whr::WHR, player::Int64, day::Int64)
 	return whr.playerdayratings[player][day], uncertainty(whr, player)[day]
 end
 
-function predict(whr::WHR, P1::Int, P2::Int, var; rating_day = missing)
+function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing)
 	#Predict with logitnormal distribution, pulling forward the variance to the rating day (default, present day)
-
-	if !haskey(whr.playerdaygames, P1)
-		return missing
-	end
-	if !haskey(whr.playerdaygames, P2)
-		return missing
-	end
 
 	#If no rating_day provided, use the last day on which either player was rated
 	if ismissing(rating_day)
@@ -411,25 +398,23 @@ function predict(whr::WHR, P1::Int, P2::Int, var; rating_day = missing)
 	end
 
 	#If no games, set default r value
-	if length(whr.playerdaygames[P1]) == 0
+	if !haskey(whr.playerdaygames, P1) || length(whr.playerdaygames[P1]) == 0
 		r1 = 0.0
 		var1 = 1.0
 	else
 		lastdayP1 = maximum(keys(whr.playerdaygames[P1]))
 		r1, var1_lastday = rating(whr, P1, lastdayP1)
-		var1 = var1_lastday + ((abs(rating_day - lastdayP1) + var) * abs(whr.w2))
+		var1 = abs(var1_lastday) + abs(rating_day - lastdayP1) * abs(whr.w2)
 	end
 
-	if length(whr.playerdaygames[P2]) == 0
+	if !haskey(whr.playerdaygames, P2) || length(whr.playerdaygames[P2]) == 0
 		r2 = 0.0
 		var2 = 1.0
 	else
 		lastdayP2 = maximum(keys(whr.playerdaygames[P2]))
 		r2, var2_lastday = rating(whr, P2, lastdayP2)
-		var2 = var2_lastday + ((abs(rating_day - lastdayP2) + var) * abs(whr.w2))
+		var2 = abs(var2_lastday) + abs(rating_day - lastdayP2) * abs(whr.w2)
 	end
-	
-	#Now add any handicap for either player
 
 	#Difference between two normally distributed RVs is normally distributed with mean of the difference of the two means, and variance as sum of the variances.
 	#For the probability, we are looking for the logistic function of this normal distribution: given by the mean of the logit-normal (I hope).

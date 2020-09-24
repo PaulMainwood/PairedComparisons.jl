@@ -29,6 +29,7 @@ end
 function fit!(m::Elo, games::DataFrame; verbose = false)
     #= Wrapper function to choose the right approach to fit a dataframe of games =#
     titles = names(games)
+
     if !issubset(["P1", "P2", "P1_wins", "P2_wins"], titles)
         error("For rating, we need at least columns named P1, P2, P1_wins, P2_wins")
     end
@@ -52,7 +53,7 @@ function fit!(m::Elo, games::DataFrame; verbose = false)
 end
 
 
-function fast_fit!(m::Elo, P1, P2, P1_won, P2_won; handicap = 0.0)
+function fast_fit!(m::Elo, P1, P2, P1_wins, P2_wins; handicap = 0.0)
     #=
     This function is used when matches themsleves define time periods. It
     simply updates the two players' elo ratings once per match
@@ -60,7 +61,7 @@ function fast_fit!(m::Elo, P1, P2, P1_won, P2_won; handicap = 0.0)
     Do not use when one is doing tournament or by-day elo updates where one might
     have many-one/one-many matches.
     =#
-    surprise = m.kfac * (P1_won - predict(m, P1, P2, handicap) * (P1_won + P2_won))
+    surprise = m.kfac * (P1_wins - predict(m, P1, P2, handicap) * (P1_wins + P2_wins))
     m.ratings[P1] = get(m.ratings, P1, m.default_rating) + surprise
     m.ratings[P2] = get(m.ratings, P2, m.default_rating) - surprise
 end
@@ -76,7 +77,7 @@ function period_fit!(m::Elo, original_games::DataFrame)
     games = dupe_for_rating(original_games)
 
     #Split into days
-    for day_games in groupby(games, :Period)
+    for day_games in groupby(games, :Period, sort = true)
         #Add elo predictions to each game in each day
         day_games = DataFrame(day_games)
         day_games[!, :Predict] = predict.(Ref(m), day_games.P1, day_games.P2, day_games.Handicap) .* (day_games.P1_wins .+ day_games.P2_wins) 
@@ -86,7 +87,7 @@ function period_fit!(m::Elo, original_games::DataFrame)
     end
 end
 
-function predict(m::Elo, i::Integer, j::Integer)
+function predict(m::Elo, i::Integer, j::Integer; rating_day::Integer = 0)
     #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
     return 1.0 / (1.0 + exp((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating))))
 end
