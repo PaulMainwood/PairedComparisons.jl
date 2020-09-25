@@ -44,11 +44,6 @@ function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = tru
 			add_gameday!(whr::WHR, P1[row], Day[row])
 			whr.playerdaygames[P1[row]][Day[row]] = vcat([(P2[row], 1.0) for i in 1:P1_wins[row]], [(P2[row], 0.0) for j in 1:P2_wins[row]])
 			games_added += 1
-			#Add dummy games if toggle is on
-			if dummy_games
-				add_dummy_games_whr!(whr, P1[row])
-			end
-
 			players_added += 1
 		end
 
@@ -91,19 +86,6 @@ function add_gameday!(whr::WHR, player::Int, day::Int)
 	#Note that one could come up with a better starting point, e.g., the last rating
 	whr.playerdaygames[player][day] = Array{Tuple{Int, Float64}}[]
 	whr.playerdayratings[player][day] = whr.default_rating
-end
-
-function add_dummy_games_whr!(whr::WHR, i::Int)
-	firstday = minimum(keys(whr.playerdaygames[i]))
-	if whr.playerdaygames[i][firstday][1] == 0
-		#if dummy games exist as the earliest games, do nothing
-		nothing
-	else
-		#if dummy games are not the first games, then add them
-		whr.playerdaygames[i][firstday] = vcat([(0, whr.default_score,), (0, 0.0)], whr.playerdaygames[i][firstday])
-		#if we have dummy games but they are not the first ones then Delete existing dummy games and create new ones
-		#ADD THIS. DOES NOT MATTER IF ALWAYS ADDING FUTURE GAMES BUT WILL MATTER LATER
-	end
 end
 
 function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001, verbose = false, show_ll = false, ll_every = 1)
@@ -208,13 +190,18 @@ end
 #Broadcast the element-wise calculation of derivative elements over the playerdays
 function llderivatives(whr, player, playerdays)
 	days_played = length(playerdays)
-	lld = Array{Float64, 1}(undef, days_played)
-	ll2d = Array{Float64, 1}(undef, days_played)
+	lld = zeros(Float64, days_played)
+	ll2d = zeros(Float64, days_played)
+	#Add the term for dummy wins and losses against opponent of rating 0 on first day
+
+	r1 = exp(whr.playerdayratings[player][first(playerdays)])
+	lld[1] = (1 - r1) / (1 + r1)
+	ll2d[1] = -2 * r1 / (1 + r1)^2
 	#Loop round playerdays and add in loglikelihood derivates to vectors
 	for (daynum, day) in enumerate(playerdays)
 		llde, ll2de = llderivativeselements(whr, player, day)
-		lld[daynum] = llde
-		ll2d[daynum] = ll2de
+		lld[daynum] += llde
+		ll2d[daynum] += ll2de
 	end
 	return lld, ll2d
 end
@@ -224,14 +211,10 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	lld_tally = 0.0
 	ll2d_tally = 0.0
 	win_tally = 0.0
-	a = SLEEF.exp(get(whr.playerdayratings[player], day, 0.0))
+	a = exp(get(whr.playerdayratings[player], day, 0.0))
 
 	for (opponent, result) in whr.playerdaygames[player][day]
-		if opponent == 0
-			b = 1.0
-		else
-			b = SLEEF.exp(get(whr.playerdayratings[opponent], day, 0.0))
-		end
+		b = exp(get(whr.playerdayratings[opponent], day, 0.0))
 		win_tally += result
 		lld_tally += 1.0 / (a + b)
 		ll2d_tally += b / (a + b)^2
