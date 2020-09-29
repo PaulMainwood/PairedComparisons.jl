@@ -157,13 +157,13 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float64 = 0.001)
 	playerdays = sort(unique(collect(keys(whr.playerdaygames[player])))) #All the days the player played
 	playerratings = [whr.playerdayratings[player][day] for day in playerdays] #Array of the old rating the player had on those days
 
-	#Get the sigma2 vector
-	s2 = sigma2(playerdays, whr.w2, player)
+	#Get the sigma2 vector (one-over it in this case)
+	s2inv = sigma2inv(playerdays, whr.w2, player)
 
 	#Obtain the log likelihood derivative and second derivative at one sweep
 	lld, ll2d = llderivatives(whr, player, playerdays)
-	h = hessian(ll2d, s2, delta = delta)
-	g = gradient(lld, s2, playerratings)
+	h = hessian(ll2d, s2inv, delta = delta)
+	g = gradient(lld, s2inv, playerratings)
 
 	newratings = playerratings - inv(h) * g
 
@@ -210,10 +210,11 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	for (opponent, results) in whr.playerdaygames[player][day]
 		b = exp(get(whr.playerdayratings[opponent], day, 0.0))
 		win_tally += results[1]
-		sumab = a + b
-		lld_tally_add = (results[1] + results[2]) / sumab
+		sumab = 1.0 / (a + b)
+		lld_tally_add = (results[1] + results[2]) * sumab
+
 		lld_tally += lld_tally_add
-		ll2d_tally += lld_tally_add * b / sumab
+		ll2d_tally += lld_tally_add * b * sumab
 	end
 
 	return (win_tally - (a * lld_tally), -a * ll2d_tally)
@@ -252,36 +253,36 @@ function sigma2inv(playerdays, w2::Float64, player::Int64)
 	l = length(playerdays) - 1
 	s2inv = zeros(Float64, l)
 	for i in 1:l
-		s2inv[i] = w2 * (playerdays[i + 1] - playerdays[i])
+		s2inv[i] = 1 / (w2 * (playerdays[i + 1] - playerdays[i]))
 	end
 	return s2inv
 end
 
-
-function sigma2(playerdays, w2::Float64, player::Int64)
-	#Vector of n-1 expressions for drift from the Weiner process between ndays in which the player plays games
-	return [abs(w2) * (playerdays[i + 1] - playerdays[i]) for i in 1:(length(playerdays) - 1)]
-end
-
-function hessian(ll2d, s2; delta::Float64 = 0.001)
+function hessian(ll2d, s2inv; delta::Float64 = 0.001)
 	#Construct tridiagonal hessian matrix
-	invs2 = 1.0 ./ s2
-	prior = -1 .* (vcat(0.0, invs2) .+ vcat(invs2, 0.0))
-	d = ll2d .+ prior .- delta
-	dl = invs2
-	du = invs2
-	return Tridiagonal(dl, d, du)
+
+	l = length(ll2d)
+
+	prior = zeros(Float64, l)
+
+	prior[1] = s2inv[1]
+	for i in 2:l-1
+		prior[i] = s2inv[i - 1] + s2inv[i]
+	end
+	prior[l] = s2inv[l - 1]
+	d = ll2d .- prior .- delta
+	return Tridiagonal(s2inv, d, s2inv)
 end
 
-function gradient(lld, s2, playerratings)
+function gradient(lld, s2inv, playerratings)
 	#Construct gradient vector
 	l = length(lld)	
 	prior = zeros(Float64, l)
-	prior[1] = (playerratings[2] - playerratings[1]) / s2[1]
+	prior[1] = (playerratings[2] - playerratings[1]) * s2inv[1]
 	for i in 2:(l-1)
-		prior[i] = (playerratings[i + 1] - playerratings[i]) / s2[i] - (playerratings[i] - playerratings[i - 1]) / s2[i - 1]
+		prior[i] = (playerratings[i + 1] - playerratings[i]) * s2inv[i] - (playerratings[i] - playerratings[i - 1]) * s2inv[i - 1]
 	end
-	prior[l] = - (playerratings[l] - playerratings[l - 1]) / s2[l - 1]
+	prior[l] = - (playerratings[l] - playerratings[l - 1]) * s2inv[l - 1]
 
 	#prior = vcat(difference ./ s2, 0.0) - vcat(0.0, difference ./ s2)
 	return lld .+ prior
@@ -307,10 +308,10 @@ function covariance(whr::WHR, player::Int64)
 	playerdays = sort(unique(collect(keys(whr.playerdaygames[player]))))
 	playerratings = [whr.playerdayratings[player][day] for day in playerdays]
 
-	s2 = sigma2(playerdays, whr.w2, player)
+	s2inv = sigma2inv(playerdays, whr.w2, player)
 	lld, ll2d = llderivatives(whr, player, playerdays)
-	h = hessian(ll2d, s2)
-	g = gradient(lld, s2, playerratings)
+	h = hessian(ll2d, s2inv)
+	g = gradient(lld, s2inv, playerratings)
 
 	n = length(playerdays)
 
