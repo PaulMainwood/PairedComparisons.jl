@@ -21,7 +21,7 @@ struct WHR
 	w2::Float64
 end
 
-function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Array{Tuple{Int64, Float64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
+function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float64}}(), playerdaygames = Dict{Int64, Dict{Int64, Dict{Int64, Tuple{Int64, Int64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
 	return WHR(playerdayratings, playerdaygames, default_rating, default_score, w2)
 end
 
@@ -34,59 +34,52 @@ function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = tru
 
 	games_added = 0
 	players_added = 0
-	players_to_iterate = Int64[]
 
 	for row in 1:length(P1)
-		#If this row introduces a new player, create their (empty) entry in the playerdaygames dictionary, create a new playerday and add dummy games
+		#If this row introduces a new player1, create their (empty) entry in the playerdaygames dictionary, create a new playerday and add games
 		if !haskey(whr.playerdaygames, P1[row])
-
 			add_player!(whr::WHR, P1[row])
-			add_gameday!(whr::WHR, P1[row], Day[row])
-			whr.playerdaygames[P1[row]][Day[row]] = vcat([(P2[row], 1.0) for i in 1:P1_wins[row]], [(P2[row], 0.0) for j in 1:P2_wins[row]])
-			games_added += 1
 			players_added += 1
 		end
 
-		#If this row just introduces a new gameday, create their dictionary for this gameday
+		#If this row introduces a new gameday for a player, add that.
 		if !haskey(whr.playerdaygames[P1[row]], Day[row])
 			add_gameday!(whr::WHR, P1[row], Day[row])
 		end
 
-		#Now add the game to the appropriate gameday for the appropriate player
-		#Terms of tuple are:
-		# 1: Index of opponent
-		# 2: Win or loss 1.0 vs 0.0, with potential for 0.5 or other scores if required for other applications
+		#If this row introduces a new opponent in an existing gameday for a player, add that.
+		if !haskey(whr.playerdaygames[P1[row]][Day[row]], P2[row])
+			add_each_game!(whr::WHR, P1[row], Day[row], P2[row], P1_wins[row], P2_wins[row])
+			games_added += 1
+		end
+
+		#If none of the conditions hold, then game likely a duplicate and should ignore.
+
+	end
+	verbose && println("Added ", games_added ÷ 2, " new games out of ", length(P1) ÷ 2)
+	verbose && println("Added ", players_added, " new players.")
+end
 
 		
-		new_games = vcat([(P2[row], 1.0) for i in 1:P1_wins[row]], [(P2[row], 0.0) for j in 1:P2_wins[row]])
-		destination = whr.playerdaygames[P1[row]][Day[row]]
 
-		#Check games are not already there, and if not add them and count them
-		if !in(first(new_games), destination)
-			whr.playerdaygames[P1[row]][Day[row]] = vcat(destination, new_games)
-			games_added += 1
-			#players_to_iterate = vcat([P1[row], P2[row]], players_to_iterate)
-		else
-			nothing
-		end
-	end
-	verbose && println("Added ", games_added, " new games out of ", length(P1))
-	verbose && println("Added ", players_added, " new players.")
-	#return unique(players_to_iterate)
-end
-
-function add_player!(whr::WHR, player::Int)
+function add_player!(whr::WHR, player::Int64)
 	#Create an empty Dictionary for a new player: day => gamesarray and a new ratings Dictionary day => rating
-	whr.playerdaygames[player] = Dict{Int, Array{Tuple{Int, Float64}}}()
-	whr.playerdayratings[player] = Dict{Int, Float64}()
+	whr.playerdaygames[player] = Dict{Int64, Dict{Int64, Tuple{Int64, Int64}}}()
+	whr.playerdayratings[player] = Dict{Int64, Float64}()
 end
 
-function add_gameday!(whr::WHR, player::Int, day::Int)
-	#Create an empty Array for a new gameday: Array((P2, Result)) and a new rating for that gameday
-	#Note that one could come up with a better starting point, e.g., the last rating
-	whr.playerdaygames[player][day] = Array{Tuple{Int, Float64}}[]
+function add_gameday!(whr::WHR, player::Int64, day::Int64)
+	#Create an empty Dict for a new gameday and a new rating for that gameday
+	#Note that one could come up with a better starting point, e.g., the previous rating
+	whr.playerdaygames[player][day] = Dict{Int64, Tuple{Int64, Int64}}()
 	whr.playerdayratings[player][day] = whr.default_rating
 end
+
+function add_each_game!(whr::WHR, P1::Int64, day::Int64, P2::Int64, P1_wins::Int64, P2_wins::Int64)
+	#Create a new opponent (P2) and add the scores of the game as a Tuple
+	whr.playerdaygames[P1][day][P2] = (P1_wins, P2_wins)
+end
+
 
 function iterate!(whr::WHR, iterations::Int64; exclude_non_ford::Bool = false, delta::Float64 = 0.001, verbose = false, show_ll = false, ll_every = 1)
 
@@ -162,7 +155,7 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float64 = 0.001)
 	#Note: using "get" might allow to set initial rating at average of others - big speed-up
 
 	playerdays = sort(unique(collect(keys(whr.playerdaygames[player])))) #All the days the player played
-	playerratings = [whr.playerdayratings[player][day] for day in playerdays] #The old rating the player had on those days
+	playerratings = [whr.playerdayratings[player][day] for day in playerdays] #Array of the old rating the player had on those days
 
 	#Get the sigma2 vector
 	s2 = sigma2(playerdays, whr.w2, player)
@@ -192,11 +185,12 @@ function llderivatives(whr, player, playerdays)
 	days_played = length(playerdays)
 	lld = zeros(Float64, days_played)
 	ll2d = zeros(Float64, days_played)
-	#Add the term for dummy wins and losses against opponent of rating 0 on first day
 
+	#Add the term for 1 dummy win and 1 dummy loss against opponent of rating 0 on first day
 	r1 = exp(whr.playerdayratings[player][first(playerdays)])
 	lld[1] = (1 - r1) / (1 + r1)
 	ll2d[1] = -2 * r1 / (1 + r1)^2
+
 	#Loop round playerdays and add in loglikelihood derivates to vectors
 	for (daynum, day) in enumerate(playerdays)
 		llde, ll2de = llderivativeselements(whr, player, day)
@@ -213,11 +207,11 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	win_tally = 0.0
 	a = exp(get(whr.playerdayratings[player], day, 0.0))
 
-	for (opponent, result) in whr.playerdaygames[player][day]
+	for (opponent, results) in whr.playerdaygames[player][day]
 		b = exp(get(whr.playerdayratings[opponent], day, 0.0))
-		win_tally += result
-		lld_tally += 1.0 / (a + b)
-		ll2d_tally += b / (a + b)^2
+		win_tally += results[1]
+		lld_tally += (results[1] + results[2]) / (a + b)
+		ll2d_tally += (results[1] + results[2]) * b / (a + b)^2
 	end
 
 	return (win_tally - (a * lld_tally), -a * ll2d_tally)
@@ -348,8 +342,13 @@ end
 
 function uncertainty(whr::WHR, player::Int64)
 	#Create a dictionary of uncertainties around each rating for a player
-	playerdays = sort(unique(collect(keys(whr.playerdaygames[player]))))
-	ndays = length(whr.playerdaygames[player])
+	if haskey(whr.playerdaygames, player)
+		playerdays = sort(unique(collect(keys(get(whr.playerdaygames, player, [0])))))
+		ndays = length(whr.playerdaygames[player])
+	else
+		playerdays = [0]
+		ndays = 0
+	end
 
 	if ndays > 1
 		c = covariance(whr, player)
@@ -362,14 +361,41 @@ function uncertainty(whr::WHR, player::Int64)
 	return d
 end
 
-function rating(whr::WHR, player::Int64)
+function ratings(whr::WHR, player::Int64)
 	#Return the two ratings dictionaries - of ratings, and of the uncertainties around them
-	return whr.playerdayratings[player], uncertainty(whr, player)
+	return get(whr.playerdayratings, player, whr.default_rating), uncertainty(whr, player)
 end
 
-function rating(whr::WHR, player::Int64, day::Int64)
-	#Return the player's rating on a day, and the uncertainties it has
-	return whr.playerdayratings[player][day], uncertainty(whr, player)[day]
+function rating(whr::WHR, player::Int64; rating_day::Int64)
+	#Return the player's rating on a day, and the uncertainties it has, projected forward from last rating period
+	
+	if haskey(whr.playerdayratings, player)
+		rating_dict, var_dict = ratings(whr, player)
+	else
+		return whr.default_rating, 1.0
+	end
+
+
+	if haskey(rating_dict, rating_day)
+		rating = rating_dict[rating_day]
+		var = var_dict[rating_day]
+	else
+		b = collect(keys(rating_dict))
+		if isempty(b[b .< rating_day])
+			rating = whr.default_rating
+			var = 1.0
+		else
+			last_day_rated = maximum(b[map(x -> x < rating_day, b)])
+			rating = rating_dict[last_day_rated]
+			var = get(var_dict, last_day_rated, 0)  + abs(last_day_rated - rating_day) * abs(whr.w2)
+		end
+	end
+	return rating, var
+end
+
+function rating(whr::WHR, P1::Int64, P2::Int64; rating_day::Int64 = 0)
+	#Return a pair of players' ratings as a pair of tuples
+	return rating(whr, P1; rating_day = rating_day), rating(whr, P2; rating_day = rating_day)
 end
 
 function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing)

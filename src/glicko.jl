@@ -87,14 +87,22 @@ end
 
 #Returns the predicted result for any two players in the existing Glicko rating dictionary
 function predict(m::Glicko, i::Integer, j::Integer; rating_day::Integer = 0)
+    r, RD = rating(m, i, rating_day = rating_day)
+    rj, RDj = rating(m, j, rating_day = rating_day)
+    return 1 / (1 + exp(g(sqrt(RDj^2 + RD^2)) * (rj - r)))
+end
+
+#Returns the rating of a player on a day. If the rating day is before the last day rated, we just take their RD from that day
+function rating(m::Glicko, i::Int64; rating_day::Integer = 0)
     r, RD, last_rated = get(m.ratings, i, m.default_rating)
-    rj, RDj, last_rated_j = get(m.ratings, j, m.default_rating)
 
     if rating_day > last_rated
         RD = RD_drift(RD, m.c, m.default_rating[2], rating_day, last_rated)
     end
-    if rating_day > last_rated_j
-        RDj = RD_drift(RDj, m.c, m.default_rating[2], rating_day, last_rated_j)
-    end
-    return 1 / (1 + exp(g(sqrt(RDj^2 + RD^2)) * (rj - r)))
+
+    return r, RD
+end
+
+function rating(m::Glicko, i::Int64, j::Int64; rating_day::Integer = 0)
+    return rating(m, i, rating_day = rating_day), rating(m, j, rating_day = rating_day)
 end

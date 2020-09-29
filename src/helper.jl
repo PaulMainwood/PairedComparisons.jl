@@ -109,9 +109,12 @@ function recent_players(games::DataFrame, recent_days::Int)
 end
 
 function log_loss(predicted, actual; tol = 0.001)
-
 	predicted = min.(max.(predicted, tol), 1 .- tol)
-	return -1.0 * (sum(actual .* log.(predicted) + (1 .- actual) .* log.(1 .- predicted))) / length(actual)
+	return -1 * (sum(actual .* log.(predicted) + (1 .- actual) .* log.(1 .- predicted))) / length(actual)
+end
+
+function log_loss(predicted; tol = 0.001)
+	log_loss(predicted, ones(length(predicted)); tol = tol)
 end
 
 function add_blanks(playerdayratings::Dict)
@@ -154,21 +157,36 @@ function last_surface(m, s)
 end
 
 
-function jumble(predictions)
+function jumble(matrix)
     #Run through and reverse half the games for ratings assessment
-    l = length(predictions)
-    true_scores = ones(Float64, l)
-    jumbled_predictions = ones(Float64, l)
+    row_length = size(matrix)[1]
+    true_scores = ones(Float64, row_length)
+    jumbled_matrix = similar(matrix)
     
-    for row in 1:l
+    for row in 1:row_length
         
         if isodd(row)
-            jumbled_predictions[row] = 1.0 - predictions[row]
+            jumbled_matrix[row, :] = 1 .- matrix[row, :]
             true_scores[row] = 0.0
         else
-            jumbled_predictions[row] = predictions[row]
+            jumbled_matrix[row, :] = matrix[row, :]
             true_scores[row] = 1.0
         end
     end
-    return jumbled_predictions, true_scores
+    return jumbled_matrix, true_scores
 end
+
+function unscrambletuples(arr)
+    r1 = zeros(Float64, size(arr)[1])
+    r2 = zeros(Float64, size(arr)[1])
+    var1 = zeros(Float64, size(arr)[1])
+    var2 = zeros(Float64, size(arr)[1])
+    for i in 1:size(arr)[1]
+        r1[i] = arr[i][1][1]
+        r2[i] = arr[i][2][1]
+        var1[i] = arr[i][1][2]
+        var2[i] = arr[i][2][2]
+    end
+    return r1, r2, var1, var2
+end
+        

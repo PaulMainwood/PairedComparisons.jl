@@ -12,7 +12,6 @@
 # This algorithm is also much faster (fast_fit!, below)
 ##############################################################################################################################################
 
-
 #Struct is an Elo object - in this version it's a dict and a base kfactor
 struct Elo
     kfac::Real
@@ -31,37 +30,28 @@ function fit!(m::Elo, games::DataFrame; verbose = false)
     titles = names(games)
 
     if !issubset(["P1", "P2", "P1_wins", "P2_wins"], titles)
-        error("For rating, we need at least columns named P1, P2, P1_wins, P2_wins")
+        error("For rating, we need at least four columns named P1, P2, P1_wins, P2_wins")
     end
 
     #Depending on whether time periods are specified or not
     if !in("Period", names(games))
         verbose && println("No distinct periods found. Treating each game as a separate rating period and using fastelo algorithm.")
-        if in("Handicap", names(games))
-            fast_fit!.(Ref(m), games.P1, games.P2, games.P1_wins, games.P2_wins, handicap = games.Handicap)
-        else
-            fast_fit!.(Ref(m), games.P1, games.P2, games.P1_wins, games.P2_wins)
-        end
+        fast_fit!.(Ref(m), games.P1, games.P2, games.P1_wins, games.P2_wins)
     else
-        if in("Handicap", names(games))
-            period_fit!(m, games[!, [:P1, :P2, :P1_wins, :P2_wins, :Period, :Handicap]])
-        else
-            period_fit!(m, games[!, [:P1, :P2, :P1_wins, :P2_wins, :Period]])
-        end
+        period_fit!(m, games[!, [:P1, :P2, :P1_wins, :P2_wins, :Period]])
     end
     return nothing
 end
 
 
-function fast_fit!(m::Elo, P1, P2, P1_wins, P2_wins; handicap = 0.0)
+function fast_fit!(m::Elo, P1, P2, P1_wins, P2_wins)
     #=
     This function is used when matches themsleves define time periods. It
     simply updates the two players' elo ratings once per match
-
     Do not use when one is doing tournament or by-day elo updates where one might
     have many-one/one-many matches.
     =#
-    surprise = m.kfac * (P1_wins - predict(m, P1, P2, handicap) * (P1_wins + P2_wins))
+    surprise = m.kfac * (P1_wins - predict(m, P1, P2) * (P1_wins + P2_wins))
     m.ratings[P1] = get(m.ratings, P1, m.default_rating) + surprise
     m.ratings[P2] = get(m.ratings, P2, m.default_rating) - surprise
 end
@@ -69,10 +59,9 @@ end
 
 function period_fit!(m::Elo, original_games::DataFrame)
     #=
-    Proper fit function, using defined periods to re-rate in. Takes only first 6
-    columns of a dataframe (P1, P2, P1_wins, P2_wins, Day, Handicap)
+    Proper fit function, using defined periods to re-rate in. Takes only 
+    columns of a dataframe named (P1, P2, P1_wins, P2_wins, Day)
     =#
-    
     #Duplicate whole rating dataframe with reversed results
     games = dupe_for_rating(original_games)
 
@@ -80,9 +69,9 @@ function period_fit!(m::Elo, original_games::DataFrame)
     for day_games in groupby(games, :Period, sort = true)
         #Add elo predictions to each game in each day
         day_games = DataFrame(day_games)
-        day_games[!, :Predict] = predict.(Ref(m), day_games.P1, day_games.P2, day_games.Handicap) .* (day_games.P1_wins .+ day_games.P2_wins) 
+        day_games[!, :Predict] = predict.(Ref(m), day_games.P1, day_games.P2) .* (day_games.P1_wins .+ day_games.P2_wins) 
         #Groupby Player1 including results
-        aggregated_by_P1_games = combine(groupby(day_games, :P1), :P1_wins => sum => :P1_wins, :P2_wins => sum => :P2_wins, :Predict => sum => :Predict, :Handicap => sum => :Handicap)
+        aggregated_by_P1_games = combine(groupby(day_games, :P1), :P1_wins => sum => :P1_wins, :P2_wins => sum => :P2_wins, :Predict => sum => :Predict)
         update!(m, aggregated_by_P1_games)
     end
 end
@@ -91,12 +80,6 @@ function predict(m::Elo, i::Integer, j::Integer; rating_day::Integer = 0)
     #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
     return 1.0 / (1.0 + exp((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating))))
 end
-
-function predict(m::Elo, i::Integer, j::Integer, handicap::Float64)
-    #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
-    return 1.0 / (1.0 + exp(get(m.ratings, j, m.default_rating) - (get(m.ratings, i, m.default_rating) + handicap)))
-end
-
 
 function update!(m::Elo, games)
     #Update function allowing for period in which there may be duplicate games
@@ -117,10 +100,7 @@ end
 
 function display_ratings(elo::Elo, players)
     player_dict = Dict(players[:, 1] .=> players[:, 2])
-    
-    
     ratings = display_ratings(elo)
     ratings.player_names = map.(x -> player_dict[x], ratings.player_code)
-
     return ratings
 end
