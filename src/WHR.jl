@@ -11,7 +11,7 @@ import Distributions
 import QuadGK
 using LinearAlgebra
 using IJulia
-import SLEEF
+using LoopVectorization
 
 struct WHR
 	playerdayratings::Dict
@@ -210,8 +210,10 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	for (opponent, results) in whr.playerdaygames[player][day]
 		b = exp(get(whr.playerdayratings[opponent], day, 0.0))
 		win_tally += results[1]
-		lld_tally += (results[1] + results[2]) / (a + b)
-		ll2d_tally += (results[1] + results[2]) * b / (a + b)^2
+		sumab = a + b
+		lld_tally_add = (results[1] + results[2]) / sumab
+		lld_tally += lld_tally_add
+		ll2d_tally += lld_tally_add * b / sumab
 	end
 
 	return (win_tally - (a * lld_tally), -a * ll2d_tally)
@@ -246,6 +248,15 @@ function log_likelihood(whr::WHR)
 	return full_tally
 end
 
+function sigma2inv(playerdays, w2::Float64, player::Int64)
+	l = length(playerdays) - 1
+	s2inv = zeros(Float64, l)
+	for i in 1:l
+		s2inv[i] = w2 * (playerdays[i + 1] - playerdays[i])
+	end
+	return s2inv
+end
+
 
 function sigma2(playerdays, w2::Float64, player::Int64)
 	#Vector of n-1 expressions for drift from the Weiner process between ndays in which the player plays games
@@ -264,8 +275,15 @@ end
 
 function gradient(lld, s2, playerratings)
 	#Construct gradient vector
-	difference = diff(playerratings)
-	prior = vcat(difference ./ s2, 0.0) - vcat(0.0, difference ./ s2)
+	l = length(lld)	
+	prior = zeros(Float64, l)
+	prior[1] = (playerratings[2] - playerratings[1]) / s2[1]
+	for i in 2:(l-1)
+		prior[i] = (playerratings[i + 1] - playerratings[i]) / s2[i] - (playerratings[i] - playerratings[i - 1]) / s2[i - 1]
+	end
+	prior[l] = - (playerratings[l] - playerratings[l - 1]) / s2[l - 1]
+
+	#prior = vcat(difference ./ s2, 0.0) - vcat(0.0, difference ./ s2)
 	return lld .+ prior
 end
 
