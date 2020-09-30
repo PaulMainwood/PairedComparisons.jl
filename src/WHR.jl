@@ -158,7 +158,7 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float64 = 0.001)
 	playerratings = [whr.playerdayratings[player][day] for day in playerdays] #Array of the old rating the player had on those days
 
 	#Get the sigma2 vector (one-over it in this case)
-	s2inv = sigma2inv(playerdays, whr.w2, player)
+	s2inv = sigma2inv(playerdays, whr.w2)
 
 	#Obtain the log likelihood derivative and second derivative at one sweep
 	lld, ll2d = llderivatives(whr, player, playerdays)
@@ -249,9 +249,9 @@ function log_likelihood(whr::WHR)
 	return full_tally
 end
 
-function sigma2inv(playerdays, w2::Float64, player::Int64)
+function sigma2inv(playerdays, w2::Float64)
 	l = length(playerdays) - 1
-	s2inv = zeros(Float64, l)
+	s2inv = Array{Float64}(undef, l)
 	for i in 1:l
 		s2inv[i] = 1 / (w2 * (playerdays[i + 1] - playerdays[i]))
 	end
@@ -260,32 +260,32 @@ end
 
 function hessian(ll2d, s2inv; delta::Float64 = 0.001)
 	#Construct tridiagonal hessian matrix
-
 	l = length(ll2d)
 
-	prior = zeros(Float64, l)
+	#Most of the work goes into the prior (principal diagonal)
+	pdiag = Array{Float64}(undef, l)
 
-	prior[1] = s2inv[1]
+	pdiag[1] = ll2d[1] - s2inv[1] - delta
 	for i in 2:l-1
-		prior[i] = s2inv[i - 1] + s2inv[i]
+		pdiag[i] = ll2d[i] - s2inv[i - 1] - s2inv[i] - delta
 	end
-	prior[l] = s2inv[l - 1]
-	d = ll2d .- prior .- delta
-	return Tridiagonal(s2inv, d, s2inv)
+	pdiag[l] = ll2d[l] - s2inv[l - 1] - delta
+
+	return Tridiagonal(s2inv, pdiag, s2inv)
 end
 
 function gradient(lld, s2inv, playerratings)
 	#Construct gradient vector
 	l = length(lld)	
-	prior = zeros(Float64, l)
-	prior[1] = (playerratings[2] - playerratings[1]) * s2inv[1]
-	for i in 2:(l-1)
-		prior[i] = (playerratings[i + 1] - playerratings[i]) * s2inv[i] - (playerratings[i] - playerratings[i - 1]) * s2inv[i - 1]
-	end
-	prior[l] = - (playerratings[l] - playerratings[l - 1]) * s2inv[l - 1]
 
-	#prior = vcat(difference ./ s2, 0.0) - vcat(0.0, difference ./ s2)
-	return lld .+ prior
+	grad = Array{Float64}(undef, l)
+	grad[1] = lld[1] + (playerratings[2] - playerratings[1]) * s2inv[1]
+	for i in 2:(l-1)
+		grad[i] = lld[i] + (playerratings[i + 1] - playerratings[i]) * s2inv[i] - (playerratings[i] - playerratings[i - 1]) * s2inv[i - 1]
+	end
+	grad[l] = lld[l] - (playerratings[l] - playerratings[l - 1]) * s2inv[l - 1]
+
+	return grad
 end
 
 function check_ford(whr::WHR)
@@ -308,7 +308,7 @@ function covariance(whr::WHR, player::Int64)
 	playerdays = sort(unique(collect(keys(whr.playerdaygames[player]))))
 	playerratings = [whr.playerdayratings[player][day] for day in playerdays]
 
-	s2inv = sigma2inv(playerdays, whr.w2, player)
+	s2inv = sigma2inv(playerdays, whr.w2)
 	lld, ll2d = llderivatives(whr, player, playerdays)
 	h = hessian(ll2d, s2inv)
 	g = gradient(lld, s2inv, playerratings)
@@ -421,29 +421,29 @@ function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing)
 	#Predict with logitnormal distribution, pulling forward the variance to the rating day (default, present day)
 
 	#If no rating_day provided, use the last day on which either player was rated
-	if ismissing(rating_day)
-		rating_day = maximum((maximum(keys(whr.playerdaygames[P1])), maximum(keys(whr.playerdaygames[P2])), 0))
-	end
-
-	#If no games, set default r value
-	if !haskey(whr.playerdaygames, P1) || length(whr.playerdaygames[P1]) == 0
-		r1 = 0.0
+	if !haskey(whr.playerdaygames, P1)
+		r1 = whr.default_rating
+		var1 = 1.0
+	elseif length(whr.playerdaygames[P1]) == 0
+		r1 = whr.default_rating
 		var1 = 1.0
 	else
 		lastdayP1 = maximum(keys(whr.playerdaygames[P1]))
-		r1, var1_lastday = rating(whr, P1, lastdayP1)
-		var1 = abs(var1_lastday) + abs(rating_day - lastdayP1) * abs(whr.w2)
+		r1, var1_lastday = rating(whr, P1, rating_day = lastdayP1)
+		var1 = var1_lastday + (abs(rating_day - lastdayP1) * whr.w2)
 	end
 
-	if !haskey(whr.playerdaygames, P2) || length(whr.playerdaygames[P2]) == 0
+	if !haskey(whr.playerdaygames, P2)
+		r2 = whr.default_rating
+		var2 = 1.0
+	elseif length(whr.playerdaygames[P2]) == 0
 		r2 = 0.0
 		var2 = 1.0
 	else
 		lastdayP2 = maximum(keys(whr.playerdaygames[P2]))
-		r2, var2_lastday = rating(whr, P2, lastdayP2)
-		var2 = abs(var2_lastday) + abs(rating_day - lastdayP2) * abs(whr.w2)
+		r2, var2_lastday = rating(whr, P2, rating_day = lastdayP2)
+		var2 = var2_lastday + (abs(rating_day - lastdayP2) * whr.w2)
 	end
-
 	#Difference between two normally distributed RVs is normally distributed with mean of the difference of the two means, and variance as sum of the variances.
 	#For the probability, we are looking for the logistic function of this normal distribution: given by the mean of the logit-normal (I hope).
 	#Using approximation here with series of 10 terms
