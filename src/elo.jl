@@ -19,7 +19,7 @@ struct Elo
     default_rating::Real
 end
 
-function Elo(;kfac = 0.31, ratings = Dict{Int64, Float64}(), default_rating = 0.0)
+function Elo(;kfac = 0.31, ratings = Dict{Int64, Float64}(), default_rating = 1500.0)
     #Set up a new Elo struct, either using key words or defaults if not provided
     return Elo(kfac, ratings, default_rating)
 end
@@ -78,7 +78,7 @@ end
 
 function predict(m::Elo, i::Integer, j::Integer; rating_day::Integer = 0)
     #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
-    return 1.0 / (1.0 + exp((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating))))
+    return 1.0 / (1.0 + exp10(((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating))/400)))
 end
 
 function update!(m::Elo, games)
