@@ -13,14 +13,14 @@ function dupe_for_rating(games)
         dupe_backwards_handicap = - games.Handicap
         duplicated_games.Handicap = vcat(games.Handicap, dupe_backwards_handicap)
     else
-        duplicated_games.Handicap = 0.0
+        duplicated_games[!, :Handicap] .= 0.0
     end
 
     if in("Var", names(games))
         dupe_backwards_var = games.Var
         duplicated_games.Var = vcat(games.Var, dupe_backwards_var)
     else
-        duplicated_games.Var = 0.0
+        duplicated_games[!, :Var] .= 0.0
     end
 
     sort!(duplicated_games, :Period)
