@@ -8,9 +8,9 @@ using DataFrames
 
     @test predict(elo, 1, 2) == 0.5
 
-    games1 = DataFrame(Player1 = [1], Player2 = [2], Player1Wins = [1], Player2Wins = [0])
+    games1 = DataFrame(P1 = [1], P2 = [2], P1_wins = [1], P2_wins = [0])
     games2 = copy(games1)
-    games2.Day = [1]
+    games2.Period = [1]
 
     fit!(elo, games1)
 
@@ -20,11 +20,11 @@ using DataFrames
     #Glicko tests
     glicko = Glicko(c = 85.0, default_rating = (1500.0, 350.0, -1))
 
-    @test predict(glicko, 1, 2, 1) == 0.5
+    @test predict(glicko, 1, 2; rating_day=1) == 0.5
 
     fit!(glicko, games2)
     @test length(glicko.ratings) == 2
-    @test abs(predict(glicko, 1, 2, 1) - 0.72720) < 0.001
+    @test abs(predict(glicko, 1, 2; rating_day=1) - 0.72720) < 0.001
 
     #BradleyTerry tests
     bt = BT()
