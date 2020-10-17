@@ -48,23 +48,23 @@ function RD_drift(RD, c, defaultRD, day, last_rated)
     if last_rated < 0
         return defaultRD
     else
-        return min(sqrt(RD^2 + ((c^2) * abs(day - last_rated))), defaultRD)
+        return min(sqrt(RD^2 + c^2), defaultRD)
     end
 end
 
 #g function from Glicko paper
 function g(RD::Float64)
-    return 1 / sqrt(1 + (0.304 * RD^2))
+    return 1 / sqrt(1 + (1.0072529e-5 * RD^2))
 end
 
 #E function from Glicko paper
 function E(r::Float64, rj::Float64, RDj::Float64)
-    return 1 / (1 + exp(g(RDj) * (rj - r)))
+    return 1 / (1 + exp10(-g(RDj)*(r - rj)/400))
 end
 
-#Reciprocal of d2 function from Glicko paper
-function recipd2(r, rj, RDj)
-    return sum(g.(RDj).^2 .* E.(r, rj, RDj) .* (1 .- E.(r, rj, RDj)))
+# d squared function from Glicko paper
+function d2(r, rj, RDj, q)
+    return 1 / ((q^2)*(sum(g.(RDj).^2 .* E.(r,rj,RDj) .* (1 .- E.(r,rj,RDj)))))
 end
 
 function update_player_rating(glicko::Glicko, day::Int64, player::Int64, opponents, player_wins, opponent_wins)
@@ -79,8 +79,10 @@ function update_player_rating(glicko::Glicko, day::Int64, player::Int64, opponen
     #Again, giving drift
     RDj = RD_drift.(RDj, Ref(glicko.c), Ref(glicko.default_rating[2]), Ref(day), last_rated_j)
 
-    r_updated = r + ((1 / (1 / RD^2 + recipd2(r, rj, RDj))) * sum(g.(RDj) .* (player_wins .- ((player_wins + opponent_wins) .* E.(r, rj, RDj)))))
-    RD_updated = sqrt(1/((1 / RD^2) + recipd2(r, rj, RDj)))
+    q = 0.0057565
+    
+    r_updated = r + ((q / (1/RD^2 + 1/d2(r, rj, RDj, q))) * sum(g.(RDj) .* (player_wins .- E.(r, rj, RDj))))
+    RD_updated = sqrt(1/((1 / RD^2) + 1/d2(r, rj, RDj, q)))
 
     return (r_updated, RD_updated, day)
 end
@@ -89,7 +91,7 @@ end
 function predict(m::Glicko, i::Integer, j::Integer; rating_day::Integer = 0)
     r, RD = rating(m, i, rating_day = rating_day)
     rj, RDj = rating(m, j, rating_day = rating_day)
-    return 1 / (1 + exp(g(sqrt(RDj^2 + RD^2)) * (rj - r)))
+    return 1 / (1 + exp10(g(sqrt(RDj^2 + RD^2)) * (rj - r) / 400))
 end
 
 #Returns the rating of a player on a day. If the rating day is before the last day rated, we just take their RD from that day
