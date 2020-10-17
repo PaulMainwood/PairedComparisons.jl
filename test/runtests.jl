@@ -16,6 +16,7 @@ using DataFrames
 
     @test length(elo.ratings) == 2
     @test abs(predict(elo, 1, 2) - 0.5359159269451023) < 0.001
+    @test predict(elo, 1, 2) ≈ 0.5359159269451023
 
     #Glicko tests
     glicko = Glicko(c = 85.0, default_rating = (1500.0, 350.0, -1))
@@ -25,6 +26,7 @@ using DataFrames
     fit!(glicko, games2)
     @test length(glicko.ratings) == 2
     @test abs(predict(glicko, 1, 2; rating_day=1) - 0.72720) < 0.001
+    @test predict(glicko, 1, 2; rating_day=1) ≈ 0.72720
 
     #BradleyTerry tests
     bt = BT()
