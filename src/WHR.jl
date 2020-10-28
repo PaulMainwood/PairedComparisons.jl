@@ -259,7 +259,7 @@ function sigma2inv(playerdays, w2::Float64)
 end
 
 function hessian(ll2d, s2inv; delta::Float64 = 0.001)
-	#Construct tridiagonal hessian matrix
+	#Construct a symmetric tridiagonal hessian matrix
 	l = length(ll2d)
 
 	#Most of the work goes into the prior (principal diagonal)
@@ -271,7 +271,7 @@ function hessian(ll2d, s2inv; delta::Float64 = 0.001)
 	end
 	pdiag[l] = ll2d[l] - s2inv[l - 1] - delta
 
-	return Tridiagonal(s2inv, pdiag, s2inv)
+	return SymTridiagonal(pdiag, s2inv)
 end
 
 function gradient(lld, s2inv, playerratings)

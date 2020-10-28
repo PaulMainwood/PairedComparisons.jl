@@ -109,12 +109,19 @@ function recent_players(games::DataFrame, recent_days::Int)
 end
 
 function log_loss(predicted, actual; tol = 0.001)
-	predicted = min.(max.(predicted, tol), 1 .- tol)
-	return -1 * (sum(actual .* log.(predicted) + (1 .- actual) .* log.(1 .- predicted))) / length(actual)
+    predicted_clean = predicted[clean_nan_missing.(predicted)]
+    actual_clean = actual[clean_nan_missing.(predicted)]
+    predicted_capped = min.(max.(predicted_clean, tol), 1 .- tol)
+	return -sum((actual_clean .* log.(predicted_capped)) .+ ((1 .- actual_clean) .* log.(1 .- predicted_capped))) / length(actual_clean)
+end
+
+function clean_nan_missing(m)
+    return !(ismissing(m) | isnan(m))
 end
 
 function log_loss(predicted; tol = 0.001)
-	log_loss(predicted, ones(length(predicted)); tol = tol)
+    predicted_clean = predicted[clean_nan_missing.(predicted)]
+	log_loss(predicted_clean, ones(length(predicted_clean)); tol = tol)
 end
 
 function add_blanks(playerdayratings::Dict)
