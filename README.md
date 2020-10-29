@@ -11,7 +11,7 @@ The package allows each algorithm to be fitted to sets of games and their result
 
 For each algorithm, the package offers a struct (Elo, Glicko, BT, WHR) to record the current state, and the ratings assigned to each player.
 
-NB: For all algorithms, the ratings used are "natural" ratings rather than the scale that is used by e.g., chess players. This is to simplify calculations and allow comparability of the different ratings. To convert between Natural and Elo rating scales you can use a factor of s = ln(10) / 400. In addition, the "origin" (i.e., the default starting point of an unrated player) can also be set in different places. The algorithms in this package use a default rating of zero, but e.g., chess-players sometimes use a default of 1000, which translates to a "natural" origin of approximately 14.39. 
+NB: For all algorithms, the ratings used are "natural" ratings rather than Arpad Elo's scale that is standard amongst chess players. This is to simplify calculations and allow comparability of the different ratings. To convert between Natural and Elo rating scales you can use a factor of s = ln(10) / 400. In addition, the "origin" (i.e., the default starting point of an unrated player) can also be set in different places. The algorithms in this package use a default rating of zero, but e.g., chess-players sometimes use a default of 1000, which translates to a "natural" origin of approximately 14.39. 
 
 ## Usage
 
