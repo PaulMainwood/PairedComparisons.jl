@@ -11,6 +11,7 @@ import Distributions
 import QuadGK
 using LinearAlgebra
 using IJulia
+using OrderedCollections
 
 struct WHR
 	playerdayratings::Dict
@@ -20,7 +21,7 @@ struct WHR
 	w2::Float32
 end
 
-function WHR(;playerdayratings = Dict{Int64, Dict{Int64, Float32}}(), playerdaygames = Dict{Int64, Dict{Int64, Dict{Int64, Tuple{Int64, Int64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
+function WHR(;playerdayratings = Dict{Int64, OrderedDict{Int64, Float32}}(), playerdaygames = Dict{Int64, OrderedDict{Int64, Dict{Int64, Tuple{Int64, Int64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
 	return WHR(playerdayratings, playerdaygames, default_rating, default_score, w2)
 end
 
@@ -63,15 +64,24 @@ end
 
 function add_player!(whr::WHR, player::Int64)
 	#Create an empty Dictionary for a new player: day => gamesarray and a new ratings Dictionary day => rating
-	whr.playerdaygames[player] = Dict{Int64, Dict{Int64, Tuple{Int64, Int64}}}()
-	whr.playerdayratings[player] = Dict{Int64, Float32}()
+	whr.playerdaygames[player] = OrderedDict{Int64, Dict{Int64, Tuple{Int64, Int64}}}()
+	whr.playerdayratings[player] = OrderedDict{Int64, Float32}()
 end
 
 function add_gameday!(whr::WHR, player::Int64, day::Int64)
 	#Create an empty Dict for a new gameday and a new rating for that gameday
 	#Note that one could come up with a better starting point, e.g., the previous rating
-	whr.playerdaygames[player][day] = Dict{Int64, Tuple{Int64, Int64}}()
+
+	#Check whether the new gameday is messing up the order of the existing days, if so 
+	sort_toggle = !isempty(keys(whr.playerdayratings[player])) && day < maximum(keys(whr.playerdayratings[player]))
+
+	whr.playerdaygames[player][day] = OrderedDict{Int64, Tuple{Int64, Int64}}()
 	whr.playerdayratings[player][day] = whr.default_rating
+
+	if sort_toggle
+		sort!(whr.playerdaygames[player][day])
+		sort!(whr.playerdayratings[player][day])
+	end
 end
 
 function add_each_game!(whr::WHR, P1::Int64, day::Int64, P2::Int64, P1_wins::Int64, P2_wins::Int64)
@@ -153,8 +163,8 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float32 = 0.001f0, 
 	#Get all the players' days played and initial ratings
 	#Note: using "get" might allow to set initial rating at average of others - big speed-up
 
-	playerdays = unique(collect(keys(sort(whr.playerdaygames[player])))) #All the days the player played
-	playerratings = [whr.playerdayratings[player][day] for day in playerdays] #Array of the old rating the player had on those days
+	playerdays = collect(keys(whr.playerdaygames[player])) #All the days the player played
+	playerratings = [whr.playerdayratings[player][day] for day in playerdays]
 
 	#Get the sigma2 vector (one-over it in this case)
 	s2inv = sigma2inv(playerdays, whr.w2)
@@ -163,22 +173,21 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float32 = 0.001f0, 
 	lld, ll2d = llderivatives(whr, player, playerdays)
 
 	if new_invert_method
-		newratings = playerratings - invHG(lld, ll2d, s2inv, playerratings, delta = delta)
+		whr.playerdayratings[player].vals = whr.playerdayratings[player].vals - invHG(lld, ll2d, s2inv, playerratings, delta = delta)
 	else
 		h = hessian(ll2d, s2inv, delta = delta)
 		g = gradient(lld, s2inv, playerratings)
 		newratings = playerratings - inv(h) * g
-	end
-
-	for (i, day) in enumerate(playerdays)
-		whr.playerdayratings[player][day] = newratings[i]
+		for (i, day) in enumerate(playerdays)
+			whr.playerdayratings[player][day] = newratings[i]
+		end
 	end
 end
 
 
 #Update using Newton-Raphson method for players with only one game
 function update_rating_1dim!(whr::WHR, player::Int64)
-	playerdays = sort(unique(collect(keys(whr.playerdaygames[player]))))
+	playerdays = collect(keys(whr.playerdaygames[player]))
 	lld, ll2d = llderivatives(whr, player, playerdays)
 	dr = lld[1] / ll2d[1]
 	whr.playerdayratings[player][playerdays[1]] = whr.playerdayratings[player][playerdays[1]] - dr
@@ -213,15 +222,22 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 
 	for (opponent, results) in whr.playerdaygames[player][day]
 		b = exp(get(whr.playerdayratings[opponent], day, 0.0))
-		win_tally += results[1]
 		sumab = 1.0 / (a + b)
-		lld_tally_add = (results[1] + results[2]) * sumab
+		lld_tally_add = sum(results) * sumab
 
+		win_tally += results[1]
 		lld_tally += lld_tally_add
 		ll2d_tally += lld_tally_add * b * sumab
 	end
 
 	return (win_tally - (a * lld_tally), -a * ll2d_tally)
+end
+
+#Not yet used, a function that results tallies and could be summed 
+function lld_ll2d(a, b, results_a_b)
+	sumab = 1.0 / (a + b)
+	lld_tally_add = sum(results) * sumab
+	return results[1], lld_tally_add, lld_tally_add * b * sumab
 end
 
 function llelements(whr, player::Int64, day::Int64)
@@ -364,7 +380,7 @@ end
 function covariance(whr::WHR, player::Int64)
 
 	#Following Appendix B in the WHR paper -- there's almost certainly a better way to do this in Julia
-	playerdays = sort(unique(collect(keys(whr.playerdaygames[player]))))
+	playerdays = collect(keys(whr.playerdaygames[player]))
 	playerratings = [whr.playerdayratings[player][day] for day in playerdays]
 
 	s2inv = sigma2inv(playerdays, whr.w2)
@@ -421,7 +437,7 @@ end
 function uncertainty(whr::WHR, player::Int64)
 	#Create a dictionary of uncertainties around each rating for a player
 	if haskey(whr.playerdaygames, player)
-		playerdays = sort(unique(collect(keys(get(whr.playerdaygames, player, [0])))))
+		playerdays = collect(keys(get(whr.playerdaygames, player, [0])))
 		ndays = length(whr.playerdaygames[player])
 	else
 		playerdays = [0]

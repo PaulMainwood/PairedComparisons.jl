@@ -57,7 +57,7 @@ function one_ahead!(bt::BradleyTerry, games_original::DataFrame; iterations_play
 end
 
 #Predict games one day at a time, then add and rescan
-function one_ahead!(whr::WHR, games_original::DataFrame; prediction_function = predict, iterations_players::Int64 = 0, iterations_all::Int64 = 1, show_ll::Bool = false, verbose = true)
+function one_ahead!(whr::WHR, games_original::DataFrame; prediction_function = predict, iterations_players::Int64 = 0, iterations_all::Int64 = 1, show_ll::Bool = false, verbose = true, new_invert_method = true)
     #games = sort(games_original, :Period)
     games = games_original
     predictions = []
@@ -90,11 +90,11 @@ function one_ahead!(whr::WHR, games_original::DataFrame; prediction_function = p
 		end
 
 		if iterations_players != 0
-			iterate!(whr, unique(vcat(day_games.P1, day_games.P2)), iterations_players)
+			iterate!(whr, unique(vcat(day_games.P1, day_games.P2)), iterations_players, new_invert_method = new_invert_method)
 		end
 
 		if iterations_all != 0
-        	iterate!(whr, iterations_all, exclude_non_ford = false, verbose = verbose)
+        	iterate!(whr, iterations_all, exclude_non_ford = false, verbose = verbose, new_invert_method = new_invert_method)
 		end
 
 		if show_ll
