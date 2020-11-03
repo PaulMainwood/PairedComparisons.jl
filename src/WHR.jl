@@ -12,6 +12,7 @@ import QuadGK
 using LinearAlgebra
 using IJulia
 using OrderedCollections
+import IterTools
 
 struct WHR
 	playerdayratings::Dict
@@ -173,11 +174,12 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float32 = 0.001f0, 
 	lld, ll2d = llderivatives(whr, player, playerdays)
 
 	if new_invert_method
-		whr.playerdayratings[player].vals = whr.playerdayratings[player].vals - invHG(lld, ll2d, s2inv, playerratings, delta = delta)
+		whr.playerdayratings[player].vals -= invHG(lld, ll2d, s2inv, playerratings, delta = delta)
 	else
 		h = hessian(ll2d, s2inv, delta = delta)
 		g = gradient(lld, s2inv, playerratings)
 		newratings = playerratings - inv(h) * g
+
 		for (i, day) in enumerate(playerdays)
 			whr.playerdayratings[player][day] = newratings[i]
 		end
@@ -200,44 +202,38 @@ function llderivatives(whr, player, playerdays)
 	ll2d = zeros(Float32, days_played)
 
 	#Add the term for 1 dummy win and 1 dummy loss against opponent of rating 0 on first day
-	r1 = exp(whr.playerdayratings[player][first(playerdays)])
+	@inbounds r1 = exp(whr.playerdayratings[player][first(playerdays)])
 	lld[1] = (1 - r1) / (1 + r1)
 	ll2d[1] = -2 * r1 / (1 + r1)^2
 
 	#Loop round playerdays and add in loglikelihood derivates to vectors
 	for (daynum, day) in enumerate(playerdays)
 		llde, ll2de = llderivativeselements(whr, player, day)
-		lld[daynum] += llde
-		ll2d[daynum] += ll2de
+		@inbounds lld[daynum] += llde
+		@inbounds ll2d[daynum] += ll2de
 	end
 	return lld, ll2d
 end
+
 
 #For each playerday, calculate the llderivates elements (first and second derivatives)
 function llderivativeselements(whr, player::Int64, day::Int64)
 	lld_tally = 0.0
 	ll2d_tally = 0.0
 	win_tally = 0.0
-	a = exp(get(whr.playerdayratings[player], day, 0.0))
+	@fastmath a = exp(get(whr.playerdayratings[player], day, 0.0))
 
 	for (opponent, results) in whr.playerdaygames[player][day]
-		b = exp(get(whr.playerdayratings[opponent], day, 0.0))
-		sumab = 1.0 / (a + b)
-		lld_tally_add = sum(results) * sumab
+		@fastmath b = exp(get(whr.playerdayratings[opponent], day, 0.0))
+		@fastmath sumab = 1.0 / (a + b)
+		@fastmath lld_tally_add = sum(results) * sumab
 
 		win_tally += results[1]
 		lld_tally += lld_tally_add
-		ll2d_tally += lld_tally_add * b * sumab
+		@fastmath ll2d_tally += lld_tally_add * b * sumab
 	end
 
 	return (win_tally - (a * lld_tally), -a * ll2d_tally)
-end
-
-#Not yet used, a function that results tallies and could be summed 
-function lld_ll2d(a, b, results_a_b)
-	sumab = 1.0 / (a + b)
-	lld_tally_add = sum(results) * sumab
-	return results[1], lld_tally_add, lld_tally_add * b * sumab
 end
 
 function llelements(whr, player::Int64, day::Int64)
@@ -250,7 +246,7 @@ function llelements(whr, player::Int64, day::Int64)
 		else
 			opponent_rating = get(whr.playerdayratings[opponent], day, 0.0)
 		end
-		ll_tally += result * own_rating + ((1 - result) * opponent_rating) - log(exp(own_rating) + exp(opponent_rating))
+		@fastmath ll_tally += result * own_rating + ((1 - result) * opponent_rating) - log(exp(own_rating) + exp(opponent_rating))
 	end
 
 	return ll_tally
