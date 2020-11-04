@@ -10,7 +10,6 @@
 import Distributions
 import QuadGK
 using LinearAlgebra
-using IJulia
 using OrderedCollections
 import IterTools
 
