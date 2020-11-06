@@ -38,7 +38,7 @@ games2.Day = [1]
 
 ## Incremental and Global Algorithms
 
-There are two separate approaches to paired comparisons in this package:
+There are two separate approaches to paired comparisons, and both the structure of the algoirthms and the interface in this package are handled differently in each case.
 
 ### Incremental algorithms
 
