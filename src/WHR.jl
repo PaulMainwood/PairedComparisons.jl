@@ -11,7 +11,6 @@ import Distributions
 import QuadGK
 using LinearAlgebra
 using OrderedCollections
-import IterTools
 
 struct WHR
 	playerdayratings::Dict
@@ -124,7 +123,7 @@ function iterate!(whr::WHR, iterations; exclude_non_ford::Bool = false, delta = 
 	end
 end
 
-function iterate!(whr::WHR, players::Array{Int64}, iterations::Int64; exclude_non_ford::Bool = false, delta::Float32 = 0.001)
+function iterate!(whr::WHR, players::Array{Int64}, iterations::Int64; exclude_non_ford::Bool = false, delta::Float32 = 0.001f0)
 	#Iterate over players selected
 	for i = 1:iterations
 		for player in players
@@ -201,7 +200,7 @@ function llderivatives(whr, player, playerdays)
 	ll2d = zeros(Float32, days_played)
 
 	#Add the term for 1 dummy win and 1 dummy loss against opponent of rating 0 on first day
-	@inbounds r1 = exp(whr.playerdayratings[player][first(playerdays)])
+	@fastmath r1 = exp(whr.playerdayratings[player][first(playerdays)])
 	lld[1] = (1 - r1) / (1 + r1)
 	ll2d[1] = -2 * r1 / (1 + r1)^2
 
