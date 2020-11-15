@@ -20,7 +20,7 @@ struct WHR
 	w2::Float32
 end
 
-function WHR(;playerdayratings = Dict{Int64, OrderedDict{Int64, Float32}}(), playerdaygames = Dict{Int64, OrderedDict{Int64, Dict{Int64, Tuple{Int64, Int64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
+function WHR(;playerdayratings = Dict{Int64, OrderedDict{Int64, Float32}}(), playerdaygames = Dict{Int64, OrderedDict{Int64, Array{Tuple{Int64, Int64, Int64}}}}(), default_rating = 0.0, default_score = 1.0, w2 = 0.000424)
 	return WHR(playerdayratings, playerdaygames, default_rating, default_score, w2)
 end
 
@@ -46,24 +46,18 @@ function add_games!(whr::WHR, original_games::DataFrame; dummy_games::Bool = tru
 			add_gameday!(whr::WHR, P1[row], Day[row])
 		end
 
-		#If this row introduces a new opponent in an existing gameday for a player, add that.
-		if !haskey(whr.playerdaygames[P1[row]][Day[row]], P2[row])
-			add_each_game!(whr::WHR, P1[row], Day[row], P2[row], P1_wins[row], P2_wins[row])
-			games_added += 1
-		end
-
-		#If none of the conditions hold, then game likely a duplicate and should ignore.
+		#Now, add the game in question
+		add_each_game!(whr::WHR, P1[row], Day[row], P2[row], P1_wins[row], P2_wins[row])
+		games_added += 1
 
 	end
 	verbose && println("Added ", games_added ÷ 2, " new games out of ", length(P1) ÷ 2)
 	verbose && println("Added ", players_added, " new players.")
 end
 
-		
-
 function add_player!(whr::WHR, player::Int64)
 	#Create an empty Dictionary for a new player: day => gamesarray and a new ratings Dictionary day => rating
-	whr.playerdaygames[player] = OrderedDict{Int64, Dict{Int64, Tuple{Int64, Int64}}}()
+	whr.playerdaygames[player] = OrderedDict{Int64, Vector{Tuple{Int64, Int64, Int64}}}()
 	whr.playerdayratings[player] = OrderedDict{Int64, Float32}()
 end
 
@@ -74,8 +68,8 @@ function add_gameday!(whr::WHR, player::Int64, day::Int64)
 	#Check whether the new gameday is messing up the order of the existing days, if so 
 	sort_toggle = !isempty(keys(whr.playerdayratings[player])) && day < maximum(keys(whr.playerdayratings[player]))
 
-	whr.playerdaygames[player][day] = OrderedDict{Int64, Tuple{Int64, Int64}}()
-	whr.playerdayratings[player][day] = whr.default_rating
+	whr.playerdaygames[player][day] = Vector{Tuple{Int64, Int64, Int64}}() #Initialise new day, with no games yet
+	whr.playerdayratings[player][day] = whr.default_rating #Set a default rating on that gameday
 
 	if sort_toggle
 		sort!(whr.playerdaygames[player][day])
@@ -85,7 +79,7 @@ end
 
 function add_each_game!(whr::WHR, P1::Int64, day::Int64, P2::Int64, P1_wins::Int64, P2_wins::Int64)
 	#Create a new opponent (P2) and add the scores of the game as a Tuple
-	whr.playerdaygames[P1][day][P2] = (P1_wins, P2_wins)
+	whr.playerdaygames[P1][day] = vcat(whr.playerdaygames[P1][day], (P2, P1_wins, P2_wins))
 end
 
 
@@ -139,7 +133,7 @@ function iterate!(whr::WHR, players::Array{Int64}, iterations::Int64; exclude_no
 	#println(iterations, " iterations on added players (", players,") completed.")
 end
 
-function iterate_to_convergence!(whr::WHR; step::Int64 = 1, delta::Float32 = 0.001, tolerance::Float32 = 0.00000001)
+function iterate_to_convergence!(whr::WHR; step::Int64 = 1, delta::Float32 = 0.001f0, tolerance::Float32 = 0.00001f0)
 	ll_percentage = 0.1
 	ll = log_likelihood(whr)
 	ll_old = ll
@@ -213,7 +207,6 @@ function llderivatives(whr, player, playerdays)
 	return lld, ll2d
 end
 
-
 #For each playerday, calculate the llderivates elements (first and second derivatives)
 function llderivativeselements(whr, player::Int64, day::Int64)
 	lld_tally = 0.0
@@ -221,12 +214,12 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	win_tally = 0.0
 	@fastmath a = exp(get(whr.playerdayratings[player], day, 0.0))
 
-	for (opponent, results) in whr.playerdaygames[player][day]
+	for (opponent, resultsw, resultsl) in whr.playerdaygames[player][day]
 		@fastmath b = exp(get(whr.playerdayratings[opponent], day, 0.0))
 		@fastmath sumab = 1.0 / (a + b)
-		@fastmath lld_tally_add = sum(results) * sumab
+		@fastmath lld_tally_add = (resultsw + resultsl) * sumab
 
-		win_tally += results[1]
+		win_tally += resultsw
 		lld_tally += lld_tally_add
 		@fastmath ll2d_tally += lld_tally_add * b * sumab
 	end
@@ -234,6 +227,7 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	return (win_tally - (a * lld_tally), -a * ll2d_tally)
 end
 
+"""
 function llelements(whr, player::Int64, day::Int64)
 	ll_tally = 0.0
 	own_rating = get(whr.playerdayratings[player], day, 0.0)
@@ -256,6 +250,7 @@ function log_likelihood(whr::WHR, player)
 	player_tally = sum(llelements(whr, player, day) for day in keys(whr.playerdaygames[player]))
 	return player_tally
 end
+"""
 
 function log_likelihood(whr::WHR)
 	#Calculate current total log-likelihood for all players
