@@ -156,8 +156,8 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float32 = 0.001f0, 
 	#Get all the players' days played and initial ratings
 	#Note: using "get" might allow to set initial rating at average of others - big speed-up
 
-	playerdays = collect(keys(whr.playerdaygames[player])) #All the days the player played
-	playerratings = [whr.playerdayratings[player][day] for day in playerdays]
+	playerdays = whr.playerdayratings[player].keys #All the days the player played
+	playerratings = whr.playerdayratings[player].vals
 
 	#Get the sigma2 vector (one-over it in this case)
 	s2inv = sigma2inv(playerdays, whr.w2)
@@ -183,7 +183,7 @@ end
 function update_rating_1dim!(whr::WHR, player::Int64)
 	playerdays = collect(keys(whr.playerdaygames[player]))
 	lld, ll2d = llderivatives(whr, player, playerdays)
-	dr = lld[1] / ll2d[1]
+	@inbounds dr = lld[1] / ll2d[1]
 	whr.playerdayratings[player][playerdays[1]] = whr.playerdayratings[player][playerdays[1]] - dr
 end
 
@@ -195,11 +195,11 @@ function llderivatives(whr, player, playerdays)
 
 	#Add the term for 1 dummy win and 1 dummy loss against opponent of rating 0 on first day
 	@fastmath r1 = exp(whr.playerdayratings[player][first(playerdays)])
-	lld[1] = (1 - r1) / (1 + r1)
-	ll2d[1] = -2 * r1 / (1 + r1)^2
+	@inbounds lld[1] = (1 - r1) / (1 + r1)
+	@inbounds ll2d[1] = -2 * r1 / (1 + r1)^2
 
 	#Loop round playerdays and add in loglikelihood derivates to vectors
-	for (daynum, day) in enumerate(playerdays)
+	@inbounds for (daynum, day) in enumerate(playerdays)
 		llde, ll2de = llderivativeselements(whr, player, day)
 		@inbounds lld[daynum] += llde
 		@inbounds ll2d[daynum] += ll2de
@@ -212,15 +212,15 @@ function llderivativeselements(whr, player::Int64, day::Int64)
 	lld_tally = 0.0
 	ll2d_tally = 0.0
 	win_tally = 0.0
-	@fastmath a = exp(get(whr.playerdayratings[player], day, 0.0))
+	@inbounds @fastmath a = exp(get(whr.playerdayratings[player], day, 0.0))
 
-	for (opponent, resultsw, resultsl) in whr.playerdaygames[player][day]
-		@fastmath b = exp(get(whr.playerdayratings[opponent], day, 0.0))
+	@inbounds for (opponent, resultsw, resultsl) in whr.playerdaygames[player][day]
+		@inbounds @fastmath b = exp(get(whr.playerdayratings[opponent], day, 0.0))
 		@fastmath sumab = 1.0 / (a + b)
 		@fastmath lld_tally_add = (resultsw + resultsl) * sumab
 
-		win_tally += resultsw
-		lld_tally += lld_tally_add
+		@fastmath win_tally += resultsw
+		@fastmath lld_tally += lld_tally_add
 		@fastmath ll2d_tally += lld_tally_add * b * sumab
 	end
 
@@ -262,7 +262,7 @@ function sigma2inv(playerdays, w2::Float32)
 	l = length(playerdays) - 1
 	s2inv = Array{Float32}(undef, l)
 	for i in 1:l
-		s2inv[i] = 1 / (w2 * (playerdays[i + 1] - playerdays[i]))
+		@inbounds s2inv[i] = 1 / (w2 * (playerdays[i + 1] - playerdays[i]))
 	end
 	return s2inv
 end
@@ -274,11 +274,11 @@ function hessian(ll2d, s2inv; delta::Float32 = 0.001f0)
 	#Most of the work goes into the prior (principal diagonal)
 	pdiag = Array{Float32}(undef, l)
 
-	pdiag[1] = ll2d[1] - s2inv[1] - delta
+	@inbounds pdiag[1] = ll2d[1] - s2inv[1] - delta
 	for i in 2:l-1
-		pdiag[i] = ll2d[i] - s2inv[i - 1] - s2inv[i] - delta
+		@inbounds pdiag[i] = ll2d[i] - s2inv[i - 1] - s2inv[i] - delta
 	end
-	pdiag[l] = ll2d[l] - s2inv[l - 1] - delta
+	@inbounds pdiag[l] = ll2d[l] - s2inv[l - 1] - delta
 	return SymTridiagonal(pdiag, s2inv)
 end
 
@@ -287,11 +287,11 @@ function gradient(lld, s2inv, playerratings)
 	l = length(lld)	
 	grad = Array{Float32}(undef, l)
 
-	grad[1] = lld[1] + (playerratings[2] - playerratings[1]) * s2inv[1]
+	@inbounds grad[1] = lld[1] + (playerratings[2] - playerratings[1]) * s2inv[1]
 	for i in 2:(l-1)
-		grad[i] = lld[i] + (playerratings[i + 1] - playerratings[i]) * s2inv[i] - (playerratings[i] - playerratings[i - 1]) * s2inv[i - 1]
+		@inbounds grad[i] = lld[i] + (playerratings[i + 1] - playerratings[i]) * s2inv[i] - (playerratings[i] - playerratings[i - 1]) * s2inv[i - 1]
 	end
-	grad[l] = lld[l] - (playerratings[l] - playerratings[l - 1]) * s2inv[l - 1]
+	@inbounds grad[l] = lld[l] - (playerratings[l] - playerratings[l - 1]) * s2inv[l - 1]
 
 	return grad
 end
@@ -317,13 +317,13 @@ function d_a_vector(ll2d, s2inv, delta)
 	d = Array{Float32}(undef, l)
 	a = Array{Float32}(undef, l - 1)
 
-	d[1] = ll2d[1] - s2inv[1] - delta
+	@inbounds d[1] = ll2d[1] - s2inv[1] - delta
 	for i in 2:l-1
-		a[i - 1] = s2inv[i - 1] / d[i - 1]
-		d[i] = ll2d[i] - s2inv[i - 1] - s2inv[i] - delta - a[i - 1] * s2inv[i - 1]
+		@inbounds a[i - 1] = s2inv[i - 1] / d[i - 1]
+		@inbounds d[i] = ll2d[i] - s2inv[i - 1] - s2inv[i] - delta - a[i - 1] * s2inv[i - 1]
 	end
-	a[l - 1] = s2inv[l - 1] / d[l - 1]
-	d[l] = ll2d[l] - s2inv[l - 1] - delta - a[l - 1] * s2inv[l - 1]
+	@inbounds a[l - 1] = s2inv[l - 1] / d[l - 1]
+	@inbounds d[l] = ll2d[l] - s2inv[l - 1] - delta - a[l - 1] * s2inv[l - 1]
 	return d, a
 end
 
@@ -332,9 +332,9 @@ function y_vector(g, a)
 	l = length(g)
 	y = Array{Float32}(undef, l)
 
-	y[1] = g[1]
+	@inbounds y[1] = g[1]
 	for i in 2:l
-		y[i] = g[i] - a[i - 1] * y[i - 1]
+		@inbounds y[i] = g[i] - a[i - 1] * y[i - 1]
 	end
 	return y
 end
@@ -345,9 +345,9 @@ function x_vector(y, b, d)
 	x = Array{Float32}(undef, l)
 
 	#Note this one goes in reverse
-	x[l] = y[l] / d[l]
+	@inbounds x[l] = y[l] / d[l]
 	for i in reverse(1:l - 1)
-		x[i] = (y[i] - b[i] * x[i + 1]) / d[i]
+		@inbounds x[i] = (y[i] - b[i] * x[i + 1]) / d[i]
 	end
 	return x
 end
@@ -481,7 +481,7 @@ function rating(whr::WHR, P1::Int64, P2::Int64; rating_day::Int64 = 0)
 	return rating(whr, P1; rating_day = rating_day), rating(whr, P2; rating_day = rating_day)
 end
 
-function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing)
+function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing, raw = false)
 	#Predict with logitnormal distribution, pulling forward the variance to the rating day (default, present day)
 
 	#If no rating_day provided, use the last day on which either player was rated
