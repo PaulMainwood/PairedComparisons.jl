@@ -86,7 +86,7 @@ function update_player_rating(glicko::Glicko, day::Int64, player::Int64, opponen
 end
 
 #Returns the predicted result for any two players in the existing Glicko rating dictionary
-function predict(m::Glicko, i::Integer, j::Integer; rating_day::Integer = 0)
+function predict(m::Glicko, i::Integer, j::Integer; rating_day::Integer = 0, kwargs...)
     r, RD = rating(m, i, rating_day = rating_day)
     rj, RDj = rating(m, j, rating_day = rating_day)
     return 1 / (1 + exp(g(sqrt(RDj^2 + RD^2)) * (rj - r)))

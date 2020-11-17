@@ -76,7 +76,7 @@ function period_fit!(m::Elo, original_games::DataFrame)
     end
 end
 
-function predict(m::Elo, i::Integer, j::Integer; rating_day::Integer = 0)
+function predict(m::Elo, i::Integer, j::Integer; kwargs...)
     #Returns the predicted result for any two players in the existing Elo rating dictionary, for a single game (%)
     return 1.0 / (1.0 + exp((get(m.ratings, j, m.default_rating) - get(m.ratings, i, m.default_rating))))
 end
