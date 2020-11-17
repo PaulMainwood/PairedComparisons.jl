@@ -199,8 +199,8 @@ function llderivatives(whr, player, playerdays)
 	@inbounds ll2d[1] = -2 * r1 / (1 + r1)^2
 
 	#Loop round playerdays and add in loglikelihood derivates to vectors
-	@inbounds for (daynum, day) in enumerate(playerdays)
-		llde, ll2de = llderivativeselements(whr, player, day)
+	Threads.@threads for daynum in 1:days_played
+		llde, ll2de = llderivativeselements(whr, player, playerdays[daynum])
 		@inbounds lld[daynum] += llde
 		@inbounds ll2d[daynum] += ll2de
 	end
