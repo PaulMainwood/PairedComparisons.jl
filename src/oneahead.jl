@@ -34,14 +34,6 @@ function one_ahead!(bt::BradleyTerry, games_original::DataFrame; iterations_play
     games = sort(games_original, :Period)
     predictions = Float64[]
 
-    if !in("Handicap", names(games))
-        games.Handicap = 0.0
-    end
-
-    if !in("Var", names(games))
-        games.Var = 0.0
-    end
-
     #Split into days which are then predicted ahead of time
     for day_games in groupby(games, :Period)
         day_games = DataFrame(day_games)

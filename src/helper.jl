@@ -3,26 +3,9 @@
 
 function dupe_for_rating(games)
     #Takes dataframe of games and predictions, reverses the players, result and prediction and appends them to end#
-    #Also adds handicap and var columns if not already there#
 
     dupe_backwards = rename(games, :P1 => :P2, :P2 => :P1, :P1_wins => :P2_wins, :P2_wins => :P1_wins)
-
     duplicated_games = vcat(games, dupe_backwards)
-
-    if in("Handicap", names(games))
-        dupe_backwards_handicap = - games.Handicap
-        duplicated_games.Handicap = vcat(games.Handicap, dupe_backwards_handicap)
-    else
-        duplicated_games.Handicap = 0.0
-    end
-
-    if in("Var", names(games))
-        dupe_backwards_var = games.Var
-        duplicated_games.Var = vcat(games.Var, dupe_backwards_var)
-    else
-        duplicated_games.Var = 0.0
-    end
-
     sort!(duplicated_games, :Period)
 
     return duplicated_games
