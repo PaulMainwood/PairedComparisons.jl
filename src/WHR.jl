@@ -481,7 +481,7 @@ function rating(whr::WHR, P1::Int64, P2::Int64; rating_day::Int64 = 0)
 	return rating(whr, P1; rating_day = rating_day), rating(whr, P2; rating_day = rating_day)
 end
 
-function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing, raw = false)
+function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing, raw = false, kwargs...)
 	#Predict with logitnormal distribution, pulling forward the variance to the rating day (default, present day)
 
 	#If no rating_day provided, use the last day on which either player was rated
