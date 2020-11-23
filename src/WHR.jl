@@ -72,8 +72,8 @@ function add_gameday!(whr::WHR, player::Int64, day::Int64)
 	whr.playerdayratings[player][day] = whr.default_rating #Set a default rating on that gameday
 
 	if sort_toggle
-		sort!(whr.playerdaygames[player][day])
-		sort!(whr.playerdayratings[player][day])
+		sort!(whr.playerdaygames[player])
+		sort!(whr.playerdayratings[player])
 	end
 end
 
