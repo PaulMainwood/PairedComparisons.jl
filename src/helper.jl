@@ -77,12 +77,12 @@ function filter_today_played_before(training_games, today_names, threshold)
     return filter(row -> row.P1_before >= threshold && row.P2_before >= threshold, today_names)
 end
 
-function filter_played_before(predictions, threshold, training_games, testing_games)
-    played = games_previously_played_count(training_games, testing_games)
-    playedf = minimum(played, dims = 2)
-    matchlength = playedf[end - length(predictions) + 1: end]
-    return predictions[matchlength .>= threshold]
+function mask_played_before(training_games, testing_games, threshold)
+    #Filter testing_games for those played before
+    played_before = minimum(games_previously_played_count(training_games, testing_games), dims = 2)
+    return played_before[end - size(testing_games, 1) + 1 : end] .>= threshold
 end
+
 
 function recent_players(games::DataFrame, recent_days::Int)
     #Return players who have had a game in the last few days
