@@ -511,7 +511,7 @@ function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing, raw = false, 
 	#Difference between two normally distributed RVs is normally distributed with mean of the difference of the two means, and variance as sum of the variances.
 	#For the probability, we are looking for the logistic function of this normal distribution: given by the mean of the logit-normal (I hope).
 	#Using approximation here with series of 10 terms
-	return mean_logitnormal_approx(r1 - r2, var1 + var2, 10)
+	return mean_logitnormal_approx(r1 - r2, abs(var1 + var2), 10)
 end
 
 function mean_logitnormal(mu, var)
