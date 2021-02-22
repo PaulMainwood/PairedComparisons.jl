@@ -91,16 +91,28 @@ function update!(m::Elo, games)
     end
 end
 
-function display_ratings(elo::Elo)
+function display_ratings(elo::Elo; rating_type = "natural")
+    #Show all ratings for players in DataFrame
     a = collect(keys(elo.ratings))
     b = map.(x -> elo.ratings[x], a)
+
+    if rating_type == "elo"
+        b = convert_natural_to_elo.(b)
+    end
+
     players = DataFrame(player_code = a, player_rating = b)
     return sort!(players, :player_rating, rev = true)
 end
 
-function display_ratings(elo::Elo, players)
+function display_ratings(elo::Elo, players; rating_type = "natural")
+    #Show ratings in Dataframe for selected players
     player_dict = Dict(players[:, 1] .=> players[:, 2])
-    ratings = display_ratings(elo)
+    ratings = display_ratings(elo, rating_type = rating_type)
     ratings.player_names = map.(x -> player_dict[x], ratings.player_code)
     return ratings
+end
+
+function convert_natural_to_elo(x)
+    #Convert natural ratings (used internally) to the normal Elo scale
+    return x * 400 / log(10) + 1000
 end

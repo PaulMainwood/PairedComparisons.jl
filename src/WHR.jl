@@ -166,6 +166,8 @@ function update_rating_ndim!(whr::WHR, player::Int64; delta::Float32 = 0.001f0, 
 	lld, ll2d = llderivatives(whr, player, playerdays)
 
 	if new_invert_method
+		change_in_rating = invHG(lld, ll2d, s2inv, playerratings, delta = delta)
+		replace!(change_in_rating, NaN => 0)
 		whr.playerdayratings[player].vals -= invHG(lld, ll2d, s2inv, playerratings, delta = delta)
 	else
 		h = hessian(ll2d, s2inv, delta = delta)
@@ -511,6 +513,7 @@ function predict(whr::WHR, P1::Int, P2::Int; rating_day = missing, raw = false, 
 	#Difference between two normally distributed RVs is normally distributed with mean of the difference of the two means, and variance as sum of the variances.
 	#For the probability, we are looking for the logistic function of this normal distribution: given by the mean of the logit-normal (I hope).
 	#Using approximation here with series of 10 terms
+
 	return mean_logitnormal_approx(r1 - r2, var1 + var2, 10)
 end
 
@@ -524,9 +527,6 @@ end
 
 function mean_logitnormal_approx(mu, var, K)
 	#Approximate function for logitnormals - about 1000 times faster and also more stable than numerical quadrature
-	if isnan(var)
-		var = 2.0
-	end
 
 	cumulative = 0.0
 	d = Distributions.Normal(mu, var)

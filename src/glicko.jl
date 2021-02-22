@@ -106,3 +106,18 @@ end
 function rating(m::Glicko, i::Int64, j::Int64; rating_day::Integer = 0)
     return rating(m, i, rating_day = rating_day), rating(m, j, rating_day = rating_day)
 end
+
+function display_ratings(m::Glicko; rating_day::Integer = 0)
+    a = collect(keys(m.ratings))
+    b = map.(x -> glicko.ratings[x][1], a)
+    c = map.(x -> glicko.ratings[x][2], a)
+    d = map.(x -> glicko.ratings[x][3], a)
+
+    if rating_type == "elo"
+        b = convert_natural_to_elo.(b)
+        c = convert_natural_to_elo.(c)
+    end
+
+    players = DataFrame(player_code = a, player_rating = b, player_sd = c, last_day_played = d)
+    return sort!(players, :player_rating, rev = true)
+end

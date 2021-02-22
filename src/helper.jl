@@ -60,6 +60,13 @@ function actual_scores(games)
     return score_safe.(games.P1_wins, games.P2_wins)
 end
 
+function games_previously_played_count(training_games)
+    m = vcat(training_games.P1, training_games.P2)
+    flattened = collect(Iterators.flatten(transpose(m)))
+    counts = cumcount(flattened)
+    return transpose(reshape(counts, 2, :))
+end
+
 function games_previously_played_count(training_games, testing_games)
     m = hcat(vcat(training_games.P1, testing_games.P2), vcat(training_games.P2, testing_games.P1))
     flattened = collect(Iterators.flatten(transpose(m)))
